@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Downloader — Library Tab</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #333;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --orange: #f97316;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--green); }
+  .header .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .header .version { font-size: 12px; color: var(--text-dim); }
+
+  .tabs { display: flex; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; }
+  .tab { padding: 10px 20px; font-size: 14px; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .content { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  /* Toolbar */
+  .toolbar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+  .toolbar input { flex: 1; min-width: 200px; padding: 9px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; }
+  .toolbar input:focus { border-color: var(--accent); }
+  .toolbar input::placeholder { color: var(--text-dim); }
+  .filter-group { display: flex; gap: 4px; }
+  .filter-btn { padding: 7px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .btn-refresh { padding: 7px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  .btn-refresh:hover { border-color: var(--accent); color: var(--text); }
+  .item-count { font-size: 12px; color: var(--text-dim); margin-left: auto; }
+
+  /* Grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card-poster { width: 100%; aspect-ratio: 2/3; background: var(--surface2); position: relative; overflow: hidden; }
+  .card-poster .letter { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 700; }
+  .card-poster .type-badge { position: absolute; top: 8px; right: 8px; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .badge-movie { background: #6366f1cc; color: white; }
+  .badge-tv { background: #3b82f6cc; color: white; }
+  .badge-anime { background: #f97316cc; color: white; }
+  .card-info { padding: 10px 12px; }
+  .card-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+  .card-meta { font-size: 11px; color: var(--text-dim); display: flex; justify-content: space-between; }
+
+  /* Modal Overlay */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; width: 680px; max-height: 85vh; overflow-y: auto; }
+  .modal-header { display: flex; justify-content: space-between; align-items: start; padding: 20px 20px 0; }
+  .modal-close { background: none; border: none; color: var(--text-dim); font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .modal-close:hover { background: var(--surface2); color: var(--text); }
+  .modal-body { padding: 0 20px 20px; }
+  .modal-media { display: flex; gap: 16px; margin-bottom: 20px; margin-top: 12px; }
+  .modal-poster { width: 140px; height: 210px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: var(--surface2); }
+  .modal-poster .letter { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 700; }
+  .modal-details h2 { font-size: 22px; margin-bottom: 6px; }
+  .modal-badges { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .mbadge { padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 600; background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+  .modal-details .overview { font-size: 13px; color: var(--text-dim); line-height: 1.5; margin-bottom: 10px; }
+  .modal-details .folder { font-size: 12px; color: var(--text-dim); font-family: monospace; background: var(--surface2); padding: 4px 8px; border-radius: 4px; display: inline-block; }
+
+  /* Seasons / Episodes */
+  .seasons { margin-top: 16px; }
+  .season-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; margin-bottom: 6px; font-size: 14px; font-weight: 500; }
+  .season-header:hover { border-color: var(--accent); }
+  .season-header .arrow { color: var(--text-dim); font-size: 12px; }
+  .episode-list { margin: 0 0 12px 0; }
+  .episode { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .episode:last-child { border-bottom: none; }
+  .ep-number { font-size: 12px; color: var(--text-dim); font-weight: 600; min-width: 50px; }
+  .ep-title { flex: 1; font-size: 13px; }
+  .ep-progress { width: 80px; }
+  .ep-progress-bar { height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-bottom: 2px; }
+  .ep-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+  .ep-progress-text { font-size: 10px; color: var(--text-dim); text-align: right; }
+  .btn-play { padding: 5px 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .btn-play:hover { background: var(--accent-hover); }
+  .btn-play.continue { background: var(--green); }
+  .btn-play.continue:hover { background: #16a34a; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <h1>Media Downloader</h1>
+    <span class="version">v1.0.0</span>
+  </div>
+  <div class="status"><span class="dot"></span> Connected</div>
+</div>
+
+<div class="tabs">
+  <div class="tab">Queue</div>
+  <div class="tab active">Library</div>
+  <div class="tab">Now Playing</div>
+</div>
+
+<div class="content">
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <input type="text" placeholder="Search library...">
+    <div class="filter-group">
+      <button class="filter-btn active">All</button>
+      <button class="filter-btn">Movies</button>
+      <button class="filter-btn">TV</button>
+      <button class="filter-btn">Anime</button>
+    </div>
+    <button class="btn-refresh">&#x21bb; Refresh</button>
+    <span class="item-count">8 items</span>
+  </div>
+
+  <!-- Grid -->
+  <div class="grid">
+    <div class="card" onclick="document.getElementById('modal').style.display='flex'">
+      <div class="card-poster">
+        <div class="letter" style="background:linear-gradient(135deg,#1a2a3a,#0a1a2a);color:#3b82f640;">B</div>
+        <span class="type-badge badge-tv">TV</span>
+      </div>
+      <div class="card-info">
+        <div class="card-title">Breaking Bad</div>
+        <div class="card-meta"><span>2008</span><span>48.2 GB</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-poster">
+        <div class="letter" style="background:linear-gradient(135deg,#2a1a1a,#1a0a0a);color:#ef444440;">D</div>
+        <span class="type-badge badge-movie">Movie</span>
+      </div>
+      <div class="card-info">
+        <div class="card-title">The Dark Knight</div>
+        <div class="card-meta"><span>2008</span><span>2.4 GB</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-poster">
+        <div class="letter" style="background:linear-gradient(135deg,#2a2a1a,#1a1a0a);color:#eab30840;">I</div>
+        <span class="type-badge badge-movie">Movie</span>
+      </div>
+      <div class="card-info">
+        <div class="card-title">Inception</div>
+        <div class="card-meta"><span>2010</span><span>2.1 GB</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-poster">
+        <div class="letter" style="background:linear-gradient(135deg,#1a1a2a,#0a0a1a);color:#6366f140;">A</div>
+        <span class="type-badge badge-anime">Anime</span>
+      </div>
+      <div class="card-info">
+        <div class="card-title">Attack on Titan</div>
+        <div class="card-meta"><span>2013</span><span>62.5 GB</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-poster">
+        <div class="letter" style="background:linear-gradient(135deg,#1a2a2a,#0a1a1a);color:#22c55e40;">S</div>
+        <span class="type-badge badge-tv">TV</span>
+      </div>
+      <div class="card-info">
+        <div class="card-title">Severance</div>
+        <div class="card-meta"><span>2022</span><span>18.7 GB</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-poster">
+        <div class="letter" style="background:linear-gradient(135deg,#2a1a2a,#1a0a1a);color:#a855f740;">D</div>
+        <span class="type-badge badge-movie">Movie</span>
+      </div>
+      <div class="card-info">
+        <div class="card-title">Dune Part Two</div>
+        <div class="card-meta"><span>2024</span><span>4.8 GB</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-poster">
+        <div class="letter" style="background:linear-gradient(135deg,#1a1a1a,#0a0a0a);color:#f9731640;">V</div>
+        <span class="type-badge badge-anime">Anime</span>
+      </div>
+      <div class="card-info">
+        <div class="card-title">Vinland Saga</div>
+        <div class="card-meta"><span>2019</span><span>35.1 GB</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-poster">
+        <div class="letter" style="background:linear-gradient(135deg,#1a2a1a,#0a1a0a);color:#22c55e40;">T</div>
+        <span class="type-badge badge-movie">Movie</span>
+      </div>
+      <div class="card-info">
+        <div class="card-title">The Shawshank Redemption</div>
+        <div class="card-meta"><span>1994</span><span>1.8 GB</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <div class="modal-header">
+      <div></div>
+      <button class="modal-close" onclick="document.getElementById('modal').style.display='none'">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-media">
+        <div class="modal-poster">
+          <div class="letter" style="background:linear-gradient(135deg,#1a2a3a,#0a1a2a);color:#3b82f640;">B</div>
+        </div>
+        <div class="modal-details">
+          <h2>Breaking Bad</h2>
+          <div class="modal-badges">
+            <span class="mbadge">TV</span>
+            <span class="mbadge">2008</span>
+            <span class="mbadge">48.2 GB</span>
+            <span class="mbadge">62 episodes</span>
+          </div>
+          <p class="overview">A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student.</p>
+          <span class="folder">Breaking Bad [1396]</span>
+        </div>
+      </div>
+
+      <!-- Seasons -->
+      <div class="seasons">
+        <div class="season-header">
+          <span>Season 1 <span style="color:var(--text-dim);font-weight:400;font-size:12px;">· 7 episodes</span></span>
+          <span class="arrow">&#9660;</span>
+        </div>
+        <div class="episode-list">
+          <div class="episode">
+            <span class="ep-number">S01E01</span>
+            <span class="ep-title">Pilot</span>
+            <div class="ep-progress">
+              <div class="ep-progress-bar"><div class="ep-progress-fill" style="width:100%"></div></div>
+              <div class="ep-progress-text">Watched</div>
+            </div>
+            <button class="btn-play" style="background:var(--surface2);color:var(--text-dim);">Watched</button>
+          </div>
+          <div class="episode">
+            <span class="ep-number">S01E02</span>
+            <span class="ep-title">Cat's in the Bag...</span>
+            <div class="ep-progress">
+              <div class="ep-progress-bar"><div class="ep-progress-fill" style="width:100%"></div></div>
+              <div class="ep-progress-text">Watched</div>
+            </div>
+            <button class="btn-play" style="background:var(--surface2);color:var(--text-dim);">Watched</button>
+          </div>
+          <div class="episode">
+            <span class="ep-number">S01E03</span>
+            <span class="ep-title">...And the Bag's in the River</span>
+            <div class="ep-progress">
+              <div class="ep-progress-bar"><div class="ep-progress-fill" style="width:62%"></div></div>
+              <div class="ep-progress-text">62%</div>
+            </div>
+            <button class="btn-play continue">Continue</button>
+          </div>
+          <div class="episode">
+            <span class="ep-number">S01E04</span>
+            <span class="ep-title">Cancer Man</span>
+            <div class="ep-progress"></div>
+            <button class="btn-play">Play</button>
+          </div>
+          <div class="episode">
+            <span class="ep-number">S01E05</span>
+            <span class="ep-title">Gray Matter</span>
+            <div class="ep-progress"></div>
+            <button class="btn-play">Play</button>
+          </div>
+          <div class="episode">
+            <span class="ep-number">S01E06</span>
+            <span class="ep-title">Crazy Handful of Nothin'</span>
+            <div class="ep-progress"></div>
+            <button class="btn-play">Play</button>
+          </div>
+          <div class="episode">
+            <span class="ep-number">S01E07</span>
+            <span class="ep-title">A No-Rough-Stuff-Type Deal</span>
+            <div class="ep-progress"></div>
+            <button class="btn-play">Play</button>
+          </div>
+        </div>
+
+        <div class="season-header">
+          <span>Season 2 <span style="color:var(--text-dim);font-weight:400;font-size:12px;">· 13 episodes</span></span>
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="season-header">
+          <span>Season 3 <span style="color:var(--text-dim);font-weight:400;font-size:12px;">· 13 episodes</span></span>
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="season-header">
+          <span>Season 4 <span style="color:var(--text-dim);font-weight:400;font-size:12px;">· 13 episodes</span></span>
+          <span class="arrow">&#9654;</span>
+        </div>
+        <div class="season-header">
+          <span>Season 5 <span style="color:var(--text-dim);font-weight:400;font-size:12px;">· 16 episodes</span></span>
+          <span class="arrow">&#9654;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
