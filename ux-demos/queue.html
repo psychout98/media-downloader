@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Downloader — Queue Tab</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #333;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+    --orange: #f97316;
+    --pink: #ec4899;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--green); }
+  .header .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .header .version { font-size: 12px; color: var(--text-dim); }
+
+  .tabs { display: flex; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; }
+  .tab { padding: 10px 20px; font-size: 14px; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .content { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  /* Search */
+  .search-bar { display: flex; gap: 10px; margin-bottom: 24px; }
+  .search-bar input { flex: 1; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; }
+  .search-bar input:focus { border-color: var(--accent); }
+  .search-bar input::placeholder { color: var(--text-dim); }
+  .search-bar button { padding: 10px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 500; }
+  .search-bar button:hover { background: var(--accent-hover); }
+
+  /* Search Result */
+  .search-result { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+  .media-info { display: flex; gap: 16px; margin-bottom: 16px; }
+  .poster { width: 120px; height: 180px; border-radius: 8px; background: var(--surface2); overflow: hidden; flex-shrink: 0; }
+  .poster .letter { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: 700; }
+  .media-details { flex: 1; }
+  .media-details h2 { font-size: 20px; margin-bottom: 4px; }
+  .media-meta { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .badge-movie { background: #6366f120; color: var(--accent); border: 1px solid #6366f140; }
+  .badge-tv { background: #3b82f620; color: var(--blue); border: 1px solid #3b82f640; }
+  .badge-year { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+  .badge-imdb { background: #f5c51820; color: #f5c518; border: 1px solid #f5c51840; }
+  .overview { font-size: 13px; color: var(--text-dim); line-height: 1.5; margin-bottom: 12px; }
+
+  /* Stream Filters */
+  .stream-filters { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  .filter-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .filter-row:last-child { margin-bottom: 0; }
+  .filter-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); min-width: 72px; flex-shrink: 0; }
+  .chip { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); transition: all 0.15s; user-select: none; }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .chip.active-green { background: var(--green); border-color: var(--green); color: white; }
+  .chip.active-pink { background: var(--pink); border-color: var(--pink); color: white; }
+  .chip.active-orange { background: var(--orange); border-color: var(--orange); color: white; }
+  .filter-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .filter-count { font-size: 12px; color: var(--text-dim); }
+  .filter-count strong { color: var(--text); }
+  .clear-btn { font-size: 11px; color: var(--accent); cursor: pointer; background: none; border: none; padding: 2px 6px; }
+  .clear-btn:hover { text-decoration: underline; }
+  .active-filters-badge { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: white; font-size: 10px; font-weight: 700; width: 18px; height: 18px; border-radius: 50%; margin-left: 6px; }
+
+  /* Stream Table */
+  .stream-table { width: 100%; border-collapse: collapse; }
+  .stream-table th { text-align: left; padding: 8px 12px; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .stream-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .stream-table tr:last-child td { border-bottom: none; }
+  .stream-table tr:hover { background: var(--surface2); }
+  .stream-name { max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stream-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+  .sbadge { padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+  .sbadge-cached { background: #22c55e20; color: var(--green); border: 1px solid #22c55e40; }
+  .sbadge-res { background: #3b82f620; color: var(--blue); border: 1px solid #3b82f640; }
+  .sbadge-hdr { background: #ec489920; color: var(--pink); border: 1px solid #ec489940; }
+  .sbadge-audio { background: #f9731620; color: var(--orange); border: 1px solid #f9731640; }
+  .btn-download { padding: 5px 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500; }
+  .btn-download:hover { background: var(--accent-hover); }
+
+  /* Pagination */
+  .pagination { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; font-size: 13px; color: var(--text-dim); }
+  .pagination select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+  .page-nav { display: flex; gap: 6px; }
+  .page-nav button { padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .page-nav button:hover { border-color: var(--accent); }
+  .page-nav button.active { background: var(--accent); border-color: var(--accent); }
+
+  /* Filter Bar */
+  .job-filter-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .job-filter-bar .label { font-size: 13px; color: var(--text-dim); margin-right: 4px; }
+  .filter-btn { padding: 5px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .filter-count-jobs { margin-left: auto; font-size: 12px; color: var(--text-dim); }
+
+  /* Job List */
+  .section-label { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+  .job-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+  .job-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .job-title { font-size: 14px; font-weight: 500; }
+  .job-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+  .status-complete { background: #22c55e20; color: var(--green); }
+  .status-downloading { background: #3b82f620; color: var(--blue); }
+  .status-failed { background: #ef444420; color: var(--red); }
+  .status-pending { background: #6366f120; color: var(--accent); }
+  .job-meta { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+  .progress-bar { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+  .progress-fill.blue { background: var(--blue); }
+  .progress-fill.green { background: var(--green); }
+  .job-actions { display: flex; gap: 6px; }
+  .btn-small { padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--text-dim); }
+  .btn-small:hover { border-color: var(--accent); color: var(--text); }
+  .btn-small.danger { color: var(--red); }
+  .btn-small.danger:hover { border-color: var(--red); }
+  .job-error { font-size: 12px; color: var(--red); margin-bottom: 6px; }
+  .job-torrent { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+
+  .toast-container { position: fixed; top: 16px; right: 16px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+  .toast { padding: 10px 16px; border-radius: 8px; font-size: 13px; animation: slideIn 0.3s ease; min-width: 260px; }
+  .toast-success { background: #22c55e20; border: 1px solid #22c55e40; color: var(--green); }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <h1>Media Downloader</h1>
+    <span class="version">v1.0.0</span>
+  </div>
+  <div class="status"><span class="dot"></span> Connected</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active">Queue</div>
+  <div class="tab">Library</div>
+  <div class="tab">Now Playing</div>
+</div>
+
+<div class="toast-container">
+  <div class="toast toast-success">Download started — Breaking Bad S01E01</div>
+</div>
+
+<div class="content">
+
+  <div class="search-bar">
+    <input type="text" placeholder="Search movies, TV shows, anime..." value="Breaking Bad S01E01">
+    <button>Search</button>
+  </div>
+
+  <div class="search-result">
+    <div class="media-info">
+      <div class="poster">
+        <div class="letter" style="background:linear-gradient(135deg,#1a3a2a,#0a2a1a);color:#22c55e40;">B</div>
+      </div>
+      <div class="media-details">
+        <h2>Breaking Bad</h2>
+        <div class="media-meta">
+          <span class="badge badge-tv">TV</span>
+          <span class="badge badge-year">2008</span>
+          <span class="badge badge-imdb">IMDb tt0903747</span>
+        </div>
+        <p class="overview">A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student in order to secure his family's future.</p>
+      </div>
+    </div>
+
+    <!-- Stream Filters -->
+    <div class="stream-filters">
+      <div class="filter-row">
+        <span class="filter-label">Resolution</span>
+        <span class="chip" onclick="toggleChip(this)">480p</span>
+        <span class="chip" onclick="toggleChip(this)">720p</span>
+        <span class="chip active" onclick="toggleChip(this)">1080p</span>
+        <span class="chip" onclick="toggleChip(this)">2160p</span>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">HDR / DV</span>
+        <span class="chip" onclick="toggleChip(this, 'active-pink')">HDR</span>
+        <span class="chip" onclick="toggleChip(this, 'active-pink')">HDR10+</span>
+        <span class="chip" onclick="toggleChip(this, 'active-pink')">Dolby Vision</span>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Audio</span>
+        <span class="chip" onclick="toggleChip(this, 'active-orange')">2.0</span>
+        <span class="chip" onclick="toggleChip(this, 'active-orange')">5.1</span>
+        <span class="chip" onclick="toggleChip(this, 'active-orange')">7.1</span>
+        <span class="chip" onclick="toggleChip(this, 'active-orange')">Atmos</span>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Cache</span>
+        <span class="chip active-green" onclick="toggleChip(this, 'active-green')">RD Cached</span>
+      </div>
+      <div class="filter-meta">
+        <span class="filter-count">Showing <strong id="filteredCount">8</strong> of <strong>12</strong> streams</span>
+        <button class="clear-btn" onclick="clearFilters()">Clear all</button>
+      </div>
+    </div>
+
+    <!-- Stream Table -->
+    <table class="stream-table">
+      <thead>
+        <tr>
+          <th>Stream</th>
+          <th>Attributes</th>
+          <th>Size</th>
+          <th>Seeders</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="streamBody">
+        <tr>
+          <td class="stream-name">Breaking.Bad.S01E01.1080p.BluRay.x265.HEVC-MZABI</td>
+          <td class="stream-badges">
+            <span class="sbadge sbadge-res">1080p</span>
+            <span class="sbadge sbadge-audio">5.1</span>
+            <span class="sbadge sbadge-cached">RD CACHED</span>
+          </td>
+          <td>1.2 GB</td>
+          <td>342</td>
+          <td><button class="btn-download">Download</button></td>
+        </tr>
+        <tr>
+          <td class="stream-name">Breaking.Bad.S01E01.1080p.BluRay.DDP5.1.Atmos.x264</td>
+          <td class="stream-badges">
+            <span class="sbadge sbadge-res">1080p</span>
+            <span class="sbadge sbadge-audio">Atmos</span>
+            <span class="sbadge sbadge-cached">RD CACHED</span>
+          </td>
+          <td>2.8 GB</td>
+          <td>198</td>
+          <td><button class="btn-download">Download</button></td>
+        </tr>
+        <tr>
+          <td class="stream-name">Breaking.Bad.S01E01.1080p.WEB-DL.DD5.1.H264-RARBG</td>
+          <td class="stream-badges">
+            <span class="sbadge sbadge-res">1080p</span>
+            <span class="sbadge sbadge-audio">5.1</span>
+            <span class="sbadge sbadge-cached">RD CACHED</span>
+          </td>
+          <td>1.5 GB</td>
+          <td>156</td>
+          <td><button class="btn-download">Download</button></td>
+        </tr>
+        <tr>
+          <td class="stream-name">Breaking.Bad.S01E01.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1</td>
+          <td class="stream-badges">
+            <span class="sbadge sbadge-res">1080p</span>
+            <span class="sbadge sbadge-audio">5.1</span>
+          </td>
+          <td>22.4 GB</td>
+          <td>67</td>
+          <td><button class="btn-download">Download</button></td>
+        </tr>
+        <tr>
+          <td class="stream-name">Breaking.Bad.S01E01.1080p.x264.AAC.2.0-LOKi</td>
+          <td class="stream-badges">
+            <span class="sbadge sbadge-res">1080p</span>
+            <span class="sbadge sbadge-audio">2.0</span>
+            <span class="sbadge sbadge-cached">RD CACHED</span>
+          </td>
+          <td>620 MB</td>
+          <td>94</td>
+          <td><button class="btn-download">Download</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="pagination">
+      <div>Showing 1–5 of 8 &nbsp; <select><option>5 per page</option><option>10 per page</option><option>25 per page</option></select></div>
+      <div class="page-nav">
+        <button class="active">1</button>
+        <button>2</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Jobs</div>
+  <div class="job-filter-bar">
+    <span class="label">Filter:</span>
+    <button class="filter-btn active">All</button>
+    <button class="filter-btn">Active</button>
+    <button class="filter-btn">Done</button>
+    <button class="filter-btn">Failed</button>
+    <span class="filter-count-jobs">4 jobs</span>
+  </div>
+
+  <div class="job-card">
+    <div class="job-header">
+      <span class="job-title">Breaking Bad — S01E01</span>
+      <span class="job-status status-downloading">Downloading</span>
+    </div>
+    <div class="job-torrent">Breaking.Bad.S01E01.1080p.BluRay.x265.HEVC-MZABI</div>
+    <div class="job-meta">1080p · 847 MB / 1.2 GB · 71%</div>
+    <div class="progress-bar"><div class="progress-fill blue" style="width:71%"></div></div>
+    <div class="job-actions"><button class="btn-small danger">Cancel</button></div>
+  </div>
+
+  <div class="job-card">
+    <div class="job-header">
+      <span class="job-title">Inception</span>
+      <span class="job-status status-pending">Pending</span>
+    </div>
+    <div class="job-torrent">Inception.2010.1080p.BluRay.x264-SPARKS</div>
+    <div class="job-meta">Queued · 2.1 GB</div>
+    <div class="job-actions"><button class="btn-small danger">Cancel</button></div>
+  </div>
+
+  <div class="job-card">
+    <div class="job-header">
+      <span class="job-title">The Dark Knight</span>
+      <span class="job-status status-complete">Complete</span>
+    </div>
+    <div class="job-torrent">The.Dark.Knight.2008.1080p.BluRay.x264-GECKOS</div>
+    <div class="job-meta">1080p · 2.4 GB · 3 min ago</div>
+    <div class="progress-bar"><div class="progress-fill green" style="width:100%"></div></div>
+    <div class="job-actions">
+      <button class="btn-small">Re-search</button>
+      <button class="btn-small danger">Delete</button>
+    </div>
+  </div>
+
+  <div class="job-card">
+    <div class="job-header">
+      <span class="job-title">Dune Part Two</span>
+      <span class="job-status status-failed">Failed</span>
+    </div>
+    <div class="job-torrent">Dune.Part.Two.2024.2160p.WEB-DL.DDP5.1.Atmos</div>
+    <div class="job-error">Error: Real-Debrid timeout — torrent not available after 30 min</div>
+    <div class="job-meta">4K · 12.8 GB · 15 min ago</div>
+    <div class="job-actions">
+      <button class="btn-small">Retry</button>
+      <button class="btn-small">Re-search</button>
+      <button class="btn-small danger">Delete</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleChip(el, activeClass) {
+  activeClass = activeClass || 'active';
+  const wasActive = el.classList.contains(activeClass) || el.classList.contains('active') || el.classList.contains('active-green') || el.classList.contains('active-pink') || el.classList.contains('active-orange');
+  el.classList.remove('active', 'active-green', 'active-pink', 'active-orange');
+  if (!wasActive) {
+    el.classList.add(activeClass);
+  }
+  updateFilterCount();
+}
+
+function clearFilters() {
+  document.querySelectorAll('.chip').forEach(c => {
+    c.classList.remove('active', 'active-green', 'active-pink', 'active-orange');
+  });
+  updateFilterCount();
+}
+
+function updateFilterCount() {
+  const active = document.querySelectorAll('.chip.active, .chip.active-green, .chip.active-pink, .chip.active-orange').length;
+  const counts = [12, 8, 5, 3, 10, 6, 9, 7, 11, 4, 8];
+  document.getElementById('filteredCount').textContent = active === 0 ? '12' : counts[active % counts.length];
+}
+</script>
+</body>
+</html>
