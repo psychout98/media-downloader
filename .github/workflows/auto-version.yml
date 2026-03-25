@@ -1,0 +1,89 @@
+name: Auto Version
+
+on:
+  push:
+    branches:
+      - main
+    # Don't trigger on tag pushes (avoids loop with release workflow)
+    tags-ignore:
+      - '**'
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    # Skip if the commit was made by this workflow (avoid infinite loop)
+    if: "!contains(github.event.head_commit.message, '[skip-version]')"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get latest version tag
+        id: get_version
+        shell: bash
+        run: |
+          # Find the latest v* tag, default to v0.0.0 if none exist
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v0.0.0"
+          fi
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
+          # Strip the 'v' prefix
+          VERSION="${LATEST_TAG#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest version: $LATEST_TAG"
+
+      - name: Bump patch version
+        id: bump
+        shell: bash
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumping $VERSION -> $NEW_VERSION"
+
+      - name: Update version in csproj files
+        shell: bash
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.NEW_VERSION }}"
+
+          # Update WPF csproj
+          sed -i "s|<Version>.*</Version>|<Version>$NEW_VERSION</Version>|" MediaDownloader.Wpf/MediaDownloader.Wpf.csproj
+
+          # Add Version to API csproj if not present, otherwise update
+          if grep -q '<Version>' MediaDownloader.Api/MediaDownloader.Api.csproj; then
+            sed -i "s|<Version>.*</Version>|<Version>$NEW_VERSION</Version>|" MediaDownloader.Api/MediaDownloader.Api.csproj
+          else
+            sed -i "s|</PropertyGroup>|    <Version>$NEW_VERSION</Version>\n  </PropertyGroup>|" MediaDownloader.Api/MediaDownloader.Api.csproj
+          fi
+
+          echo "Updated csproj files to $NEW_VERSION"
+
+      - name: Commit version bump
+        shell: bash
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.NEW_VERSION }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add MediaDownloader.Wpf/MediaDownloader.Wpf.csproj MediaDownloader.Api/MediaDownloader.Api.csproj
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No version changes to commit"
+          else
+            git commit -m "Bump version to $NEW_VERSION [skip-version]"
+            git push
+          fi
+
+      - name: Create and push tag
+        shell: bash
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.NEW_VERSION }}"
+          git tag "v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+          echo "Tagged and pushed v$NEW_VERSION"

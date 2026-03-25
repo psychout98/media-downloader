@@ -117,14 +117,24 @@ public class MainViewModel : ViewModelBase, IDisposable
 
     public MainViewModel()
     {
+        App.Log("MainViewModel constructor starting");
+
         _serverManager = new ServerManager();
         _apiClient = new ApiClient();
 
         // Determine backend path
         var appDir = AppDomain.CurrentDomain.BaseDirectory;
         var backendExe = Path.Combine(appDir, "backend", "MediaDownloader.Api.exe");
+        App.Log($"Looking for backend at: {backendExe}");
         if (File.Exists(backendExe))
+        {
             _serverManager.Configure(backendExe);
+            App.Log("Backend executable found and configured");
+        }
+        else
+        {
+            App.Log("WARNING: Backend executable not found");
+        }
 
         _serverManager.PropertyChanged += (_, e) =>
         {
@@ -152,6 +162,7 @@ public class MainViewModel : ViewModelBase, IDisposable
         _pollTimer.Tick += async (_, _) => await PollAsync();
 
         UpdateServerStatus();
+        App.Log("MainViewModel constructor completed");
     }
 
     public async Task InitializeAsync()

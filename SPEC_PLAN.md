@@ -974,6 +974,10 @@ User-facing directories (`MOVIES_DIR`, `TV_DIR`, `ARCHIVE_DIR`) only contain org
 ### Overview
 C# .NET 8 WPF application that wraps the backend server and provides a native Windows system tray experience. Manages the ASP.NET Core server lifecycle, shows active downloads, and provides quick actions. **Communicates with the backend exclusively via the HTTP API** — it does not reference the API project directly. Shared DTO classes live in `MediaDownloader.Shared`.
 
+### Application Icon
+- `MediaDownloader.Wpf/icon.ico` — committed to the repo and referenced via `<ApplicationIcon>icon.ico</ApplicationIcon>` in the csproj
+- Used for: taskbar, title bar, system tray `NotifyIcon`, and Inno Setup installer
+
 ### Features
 
 > **Canonical UI reference:** `ux-demos/wpf-app.html`
@@ -1002,6 +1006,11 @@ C# .NET 8 WPF application that wraps the backend server and provides a native Wi
 - **Update Flow:** Detects update via `GET /api/version`. "Update Now" downloads the new `MediaDownloader-Setup-{version}.exe` to `{APP_DATA_DIR}/updates/`, stops the backend, launches the installer (supports `/SILENT` flag), and exits. Inno Setup upgrades in-place and relaunches the app. When "Auto-update" toggle is enabled, updates are applied automatically without user interaction.
 - **Auto-Start:** Optional Windows startup via Registry or Startup folder
 - **Single Instance:** Prevent multiple instances via named mutex
+- **Error Handling & Diagnostics:**
+  - **Global exception handlers:** `DispatcherUnhandledException`, `AppDomain.UnhandledException`, and `TaskScheduler.UnobservedTaskException` all wired up in `App.OnStartup`. Unhandled exceptions show a `MessageBox` with the error message and log file path, then shut down gracefully.
+  - **Startup log file:** Written to `{LocalAppData}\MediaDownloader\logs\wpf-startup.log`. Captures timestamped entries for each startup phase (single-instance check, `InitializeComponent`, ViewModel creation, backend path resolution, server start, settings load). The log is append-only and helps diagnose launch failures even when the UI never renders.
+  - **Async exception safety:** All `async void` event handlers (e.g. `Loaded`, `DispatcherTimer.Tick`) wrap their bodies in `try/catch` and log failures rather than allowing them to propagate as unobserved task exceptions.
+  - **Backend path logging:** On startup, the resolved backend executable path is logged along with whether the file was found. If the backend is missing, a warning is logged (the app still starts but shows "Stopped" status).
 
 ### Architecture
 ```
@@ -1093,3 +1102,19 @@ Class library referenced by both `MediaDownloader.Api` and `MediaDownloader.Wpf`
 
 ### Installer Script Location
 `installer/setup.iss` — Inno Setup script defining all the above behavior.
+
+### CI/CD — GitHub Actions
+
+#### Auto Version Workflow (`auto-version.yml`)
+- **Trigger:** every push to `main` (excludes tag pushes and commits containing `[skip-version]`)
+- **Runner:** `ubuntu-latest`
+- **Steps:** reads the latest `v*` tag, bumps the patch number (e.g. `v0.2.3` → `v0.2.4`), updates `<Version>` in both `MediaDownloader.Wpf.csproj` and `MediaDownloader.Api.csproj`, commits with `[skip-version]` marker, creates and pushes the new `v*` tag
+- **Loop prevention:** the version-bump commit includes `[skip-version]` in the message so the workflow skips its own commits; `tags-ignore: '**'` prevents triggering on the tag push
+
+#### Release Workflow (`release.yml`)
+- **Trigger:** push of version tag (`v*`) — automatically fired by the Auto Version workflow above
+- **Runner:** `windows-latest` with .NET 8 SDK + Node.js LTS
+- **Asset validation:** all csproj-referenced resources (`ApplicationIcon`, embedded files) must be present in the repo; build fails immediately if missing
+- **Build steps:** `dotnet publish` for Api and Wpf (win-x64, self-contained), `npm ci && npm run build` for frontend
+- **Package:** run Inno Setup compiler (`iscc installer/setup.iss`)
+- **Artifact:** upload `MediaDownloader-Setup-{version}.exe` as GitHub Release asset

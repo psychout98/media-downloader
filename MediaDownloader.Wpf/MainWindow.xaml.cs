@@ -15,12 +15,32 @@ public partial class MainWindow : WpfWindow
 
     public MainWindow()
     {
+        App.Log("MainWindow constructor starting");
+
+        App.Log("Calling InitializeComponent");
         InitializeComponent();
+        App.Log("InitializeComponent completed");
+
         _viewModel = new MainViewModel();
         DataContext = _viewModel;
+        App.Log("ViewModel created and bound");
 
         SetupTrayIcon();
-        Loaded += async (_, _) => await _viewModel.InitializeAsync();
+        App.Log("Tray icon set up");
+
+        Loaded += async (_, _) =>
+        {
+            try
+            {
+                App.Log("MainWindow Loaded, calling InitializeAsync");
+                await _viewModel.InitializeAsync();
+                App.Log("InitializeAsync completed");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"InitializeAsync failed: {ex}");
+            }
+        };
     }
 
     private void DashboardTab_Checked(object sender, RoutedEventArgs e)

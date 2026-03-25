@@ -320,6 +320,7 @@ All controllers use the standard error envelope: `{ "error": "...", "detail": ".
 - `App.xaml` — entry point, single-instance check via named Mutex
 - `MainWindow.xaml` — custom title bar, tabbed layout (Dashboard, Settings)
 - Resource dictionaries for styles and themes
+- `icon.ico` — app icon file committed to repo; referenced via `<ApplicationIcon>icon.ico</ApplicationIcon>` in csproj. Used for taskbar, title bar, installer, and system tray
 - **Communicates with backend exclusively via HTTP API** — does not reference API project directly
 - `ApiClient.cs` — typed `HttpClient` wrapper calling backend at `http://localhost:{PORT}`, uses DTOs from `MediaDownloader.Shared`
 
@@ -360,15 +361,33 @@ All controllers use the standard error envelope: `{ "error": "...", "detail": ".
 - Named Mutex to prevent multiple instances
 - If second instance launched, bring existing window to foreground
 
+### Step 34b — Error handling & startup diagnostics
+- Wire `DispatcherUnhandledException`, `AppDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException` in `App.OnStartup`
+- Unhandled exceptions: show `MessageBox` with error + log path, then `Shutdown(1)`
+- Startup log file at `{LocalAppData}\MediaDownloader\logs\wpf-startup.log` (append-only, timestamped)
+- Log each startup phase: single-instance check, `InitializeComponent`, ViewModel creation, backend path resolution, server start, settings load
+- Wrap all `async void` event handlers (`Loaded`, `Tick`) in `try/catch` with logging
+- Log backend executable path and whether it was found at startup
+
 ---
 
 ## Phase 8: Installer
 
 ### Step 35 — Build pipeline
+- Pre-publish validation: all csproj-referenced assets (`ApplicationIcon`, embedded resources) must exist in the repo; CI fails fast if missing
 - `dotnet publish MediaDownloader.Api -c Release --self-contained -r win-x64` → `publish/backend/`
 - `dotnet publish MediaDownloader.Wpf -c Release --self-contained -r win-x64` → `publish/app/`
 - `cd frontend && npm run build` → copy `dist/` to `publish/backend/wwwroot/`
 - All outputs in `publish/` ready for installer
+
+### Step 35a — CI/CD release workflow (`.github/workflows/release.yml`)
+- Trigger: push to `main` with version tag (`v*`)
+- Setup: .NET 8 SDK + Node.js LTS on `windows-latest`
+- Build matrix: `dotnet publish` for Api and Wpf (win-x64, self-contained)
+- Frontend: `npm ci && npm run build` → copy `dist/` to `publish/backend/wwwroot/`
+- Asset validation: all csproj-referenced resources (icons, embedded files) must be present; build fails immediately if missing
+- Package: run Inno Setup compiler (`iscc installer/setup.iss`)
+- Artifact: upload `MediaDownloader-Setup-{version}.exe` as GitHub Release asset
 
 ### Step 36 — Inno Setup installer (`installer/setup.iss`)
 - **Welcome page** with app name + version
