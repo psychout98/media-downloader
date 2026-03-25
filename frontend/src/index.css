@@ -16,4 +16,17 @@
   --color-blue: #3b82f6;
   --color-orange: #f97316;
   --color-pink: #ec4899;
+
+  --animate-fadeUp: fadeUp 0.2s ease;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
