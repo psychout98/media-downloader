@@ -240,7 +240,7 @@
         <div class="update-title">Update Available</div>
         <div class="update-version">v1.0.0 &#8594; v1.1.0 · 3 bug fixes, 2 features</div>
       </div>
-      <button class="btn btn-accent">Update</button>
+      <button class="btn btn-accent">Update Now</button>
     </div>
   </div>
 
@@ -290,7 +290,7 @@
         <div class="update-title">Update Available</div>
         <div class="update-version">v1.0.0 &#8594; v1.1.0</div>
       </div>
-      <button class="btn btn-accent">Update</button>
+      <button class="btn btn-accent">Update Now</button>
     </div>
   </div>
   <div class="window-footer">
@@ -331,22 +331,20 @@
         <div style="display:flex;align-items:center;gap:12px;">
           <div class="update-icon" style="animation:spin 1s linear infinite;">&#8635;</div>
           <div class="update-info">
-            <div class="update-title">Installing v1.1.0</div>
-            <div class="update-version">Downloading update...</div>
+            <div class="update-title">Updating to v1.1.0</div>
+            <div class="update-version">Downloading installer...</div>
           </div>
         </div>
         <div class="update-progress">
           <div class="update-bar"><div class="update-fill"></div></div>
-          <div class="update-status">Step 2/4 — Installing Python dependencies...</div>
+          <div class="update-status">Step 1/3 — Downloading MediaDownloader-Setup-1.1.0.exe...</div>
         </div>
       </div>
 
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px;font-family:'SF Mono','Cascadia Code',monospace;font-size:11px;color:var(--text-dim);line-height:1.8;max-height:140px;overflow-y:auto;">
-        <div style="color:var(--green);">&#10003; Pulling latest changes...</div>
-        <div style="color:var(--green);">&#10003; Updated 12 files</div>
-        <div style="color:var(--accent);">&#9654; Installing Python dependencies...</div>
-        <div style="color:var(--text-dim);">&#9675; Building frontend...</div>
-        <div style="color:var(--text-dim);">&#9675; Restarting server...</div>
+        <div style="color:var(--accent);">&#9654; Downloading installer (18.4 MB / 28.2 MB)...</div>
+        <div style="color:var(--text-dim);">&#9675; Stopping backend server...</div>
+        <div style="color:var(--text-dim);">&#9675; Launching installer...</div>
       </div>
     </div>
   </div>
@@ -375,16 +373,20 @@
       <div class="section-header">Directories</div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 14px;">
         <div class="setting-row">
-          <span class="setting-label">Media Library</span>
-          <span class="setting-value">D:\Media\Library</span>
+          <span class="setting-label">Movies</span>
+          <span class="setting-value">D:\Media\Movies</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">TV Shows</span>
+          <span class="setting-value">D:\Media\TV</span>
         </div>
         <div class="setting-row">
           <span class="setting-label">Archive</span>
           <span class="setting-value">D:\Media\Archive</span>
         </div>
         <div class="setting-row">
-          <span class="setting-label">Downloads</span>
-          <span class="setting-value">D:\Media\Downloads</span>
+          <span class="setting-label">App Data</span>
+          <span class="setting-value">C:\ProgramData\MediaDownloader</span>
         </div>
       </div>
     </div>

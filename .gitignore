@@ -1,11 +1,27 @@
-__pycache__/
-*.pyc
-.env
-*.db
+# .NET
+bin/
+obj/
+publish/
+*.user
+*.suo
+*.DotSettings
+*.DotSettings.user
+.vs/
+
+# Frontend
 node_modules/
 dist/
 .vite/
+
+# App data
+.env
+*.db
 staging/
 posters/
-*.egg-info/
-.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Installer output
+installer/Output/

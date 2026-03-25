@@ -1,0 +1,6 @@
+@MediaDownloader.Api_HostAddress = http://localhost:5223
+
+GET {{MediaDownloader.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

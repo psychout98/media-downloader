@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MediaDownloader.Api", "MediaDownloader.Api\MediaDownloader.Api.csproj", "{12E7DD52-ED57-4506-BA2F-BDF3AF254CFC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MediaDownloader.Shared", "MediaDownloader.Shared\MediaDownloader.Shared.csproj", "{AA75549F-6230-4638-9DBC-9118C505994D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MediaDownloader.Wpf", "MediaDownloader.Wpf\MediaDownloader.Wpf.csproj", "{EA9B7797-EAE0-4123-A6F1-D9717E3B8E6F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{12E7DD52-ED57-4506-BA2F-BDF3AF254CFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{12E7DD52-ED57-4506-BA2F-BDF3AF254CFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{12E7DD52-ED57-4506-BA2F-BDF3AF254CFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{12E7DD52-ED57-4506-BA2F-BDF3AF254CFC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA75549F-6230-4638-9DBC-9118C505994D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA75549F-6230-4638-9DBC-9118C505994D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA75549F-6230-4638-9DBC-9118C505994D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA75549F-6230-4638-9DBC-9118C505994D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA9B7797-EAE0-4123-A6F1-D9717E3B8E6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA9B7797-EAE0-4123-A6F1-D9717E3B8E6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA9B7797-EAE0-4123-A6F1-D9717E3B8E6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA9B7797-EAE0-4123-A6F1-D9717E3B8E6F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
