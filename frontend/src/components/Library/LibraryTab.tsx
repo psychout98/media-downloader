@@ -128,9 +128,13 @@ export default function LibraryTab({ addToast, onPlay }: Props) {
       {!loading && filteredItems.length === 0 && (
         <div className="text-center py-16 text-text-dim text-sm">
           <div className="text-4xl mb-3 opacity-30">&#128218;</div>
-          <p>No items found</p>
-          {search && (
-            <p className="mt-1 text-xs">Try adjusting your search or filter</p>
+          {search || typeFilter !== 'all' ? (
+            <>
+              <p>No results found</p>
+              <p className="mt-1 text-xs">Try adjusting your search or filter</p>
+            </>
+          ) : (
+            <p>Library is empty</p>
           )}
         </div>
       )}
@@ -163,6 +167,7 @@ export default function LibraryTab({ addToast, onPlay }: Props) {
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
           onPlay={onPlay}
+          addToast={addToast}
         />
       )}
     </div>

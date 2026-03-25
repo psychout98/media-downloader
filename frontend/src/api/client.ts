@@ -196,7 +196,7 @@ export async function refreshLibrary() {
 }
 
 export function getPosterUrl(titleId: string): string {
-  return `/api/library/poster?titleId=${titleId}`;
+  return `/api/library/poster?titleId=${encodeURIComponent(titleId)}`;
 }
 
 export async function getEpisodes(titleId: string, includeArchived = false): Promise<{ seasons: SeasonInfo[] }> {

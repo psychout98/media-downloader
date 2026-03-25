@@ -214,6 +214,23 @@ export default function QueueTab({ addToast }: Props) {
     }
   }, [query, addToast]);
 
+  const handleSearchWithQuery = useCallback(async (q: string) => {
+    if (!q.trim()) return;
+    setSearching(true);
+    setSearchResult(null);
+    setFilters(emptyFilters());
+    setCurrentPage(1);
+    try {
+      const result = await searchMedia(q.trim());
+      setSearchResult(result);
+      if (result.warning) addToast(result.warning, 'info');
+    } catch (err: unknown) {
+      addToast(err instanceof Error ? err.message : 'Search failed', 'error');
+    } finally {
+      setSearching(false);
+    }
+  }, [addToast]);
+
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSearch();
   };
@@ -426,6 +443,11 @@ export default function QueueTab({ addToast }: Props) {
               )}
             </div>
           </div>
+
+          {/* No streams */}
+          {searchResult.streams.length === 0 && (
+            <p className="text-sm text-text-dim text-center py-6">No streams found</p>
+          )}
 
           {/* Stream filters */}
           {searchResult.streams.length > 0 && (
@@ -696,7 +718,7 @@ export default function QueueTab({ addToast }: Props) {
 
         {/* Job list */}
         {filteredJobs.length === 0 ? (
-          <p className="text-sm text-text-dim text-center py-8">No jobs to display.</p>
+          <p className="text-sm text-text-dim text-center py-8">No jobs found</p>
         ) : (
           <div className="space-y-2.5">
             {filteredJobs.map((job) => (
@@ -724,7 +746,10 @@ export default function QueueTab({ addToast }: Props) {
                 {/* Meta */}
                 <div className="text-xs text-text-dim mb-2">
                   {job.quality && <span>{job.quality} &middot; </span>}
-                  {job.sizeBytes > 0 && <span>{formatSize(job.sizeBytes)} &middot; </span>}
+                  {isActiveStatus(job.status) && job.downloadedBytes > 0 && job.sizeBytes > 0 && (
+                    <span>{formatSize(job.downloadedBytes)} / {formatSize(job.sizeBytes)} &middot; </span>
+                  )}
+                  {!isActiveStatus(job.status) && job.sizeBytes > 0 && <span>{formatSize(job.sizeBytes)} &middot; </span>}
                   <span>{timeAgo(job.createdAt)}</span>
                 </div>
 
@@ -751,6 +776,18 @@ export default function QueueTab({ addToast }: Props) {
                                  disabled:opacity-50"
                     >
                       {retryingJobs.has(job.id) ? 'Retrying...' : 'Retry'}
+                    </button>
+                  )}
+                  {!isActiveStatus(job.status) && job.query && (
+                    <button
+                      onClick={() => {
+                        setQuery(job.query!);
+                        handleSearchWithQuery(job.query!);
+                      }}
+                      className="px-2.5 py-1 rounded-md text-[11px] border border-border bg-surface-2
+                                 text-text-dim hover:border-accent hover:text-text transition-colors"
+                    >
+                      Re-search
                     </button>
                   )}
                   <button

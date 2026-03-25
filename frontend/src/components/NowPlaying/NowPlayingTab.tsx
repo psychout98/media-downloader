@@ -355,7 +355,7 @@ export default function NowPlayingTab({ addToast }: NowPlayingTabProps) {
               <span className="text-sm text-text">◀ Previous</span>
               {status.prevEpisode && (
                 <p className="text-xs text-text-dim truncate mt-1">
-                  E{String(status.prevEpisode.episode).padStart(2, '0')}
+                  {status.season != null ? `S${String(status.season).padStart(2, '0')}` : ''}E{String(status.prevEpisode.episode).padStart(2, '0')}
                   {status.prevEpisode.title ? ` — ${status.prevEpisode.title}` : ''}
                 </p>
               )}
@@ -368,7 +368,7 @@ export default function NowPlayingTab({ addToast }: NowPlayingTabProps) {
               <span className="text-sm text-text">Next ▶</span>
               {status.nextEpisode && (
                 <p className="text-xs text-text-dim truncate mt-1">
-                  E{String(status.nextEpisode.episode).padStart(2, '0')}
+                  {status.season != null ? `S${String(status.season).padStart(2, '0')}` : ''}E{String(status.nextEpisode.episode).padStart(2, '0')}
                   {status.nextEpisode.title ? ` — ${status.nextEpisode.title}` : ''}
                 </p>
               )}

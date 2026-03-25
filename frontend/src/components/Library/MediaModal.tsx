@@ -6,9 +6,10 @@ interface Props {
   item: LibraryItem;
   onClose: () => void;
   onPlay: () => void;
+  addToast: (message: string, type: 'error' | 'info') => void;
 }
 
-export default function MediaModal({ item, onClose, onPlay }: Props) {
+export default function MediaModal({ item, onClose, onPlay, addToast }: Props) {
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
   const [loading, setLoading] = useState(item.type === 'tv');
   const [error, setError] = useState<string | null>(null);
@@ -70,8 +71,8 @@ export default function MediaModal({ item, onClose, onPlay }: Props) {
         onPlay();
         onClose();
       }
-    } catch {
-      // silently fail -- toast would require addToast prop
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to play movie', 'error');
     }
   };
 
@@ -83,8 +84,8 @@ export default function MediaModal({ item, onClose, onPlay }: Props) {
       await openInMpc(episode.mediaItemId, playlist);
       onPlay();
       onClose();
-    } catch {
-      // silently fail
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to play episode', 'error');
     }
   };
 
