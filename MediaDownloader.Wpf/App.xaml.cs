@@ -62,7 +62,7 @@ public partial class App : System.Windows.Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Log($"FATAL dispatcher exception: {e.Exception}");
-        MessageBox.Show(
+        System.Windows.MessageBox.Show(
             $"Media Downloader encountered an error and needs to close.\n\n{e.Exception.Message}\n\nDetails have been logged to:\n{_logPath}",
             "Media Downloader - Error",
             MessageBoxButton.OK,
@@ -75,7 +75,7 @@ public partial class App : System.Windows.Application
     {
         var ex = e.ExceptionObject as Exception;
         Log($"FATAL unhandled exception: {ex}");
-        MessageBox.Show(
+        System.Windows.MessageBox.Show(
             $"Media Downloader encountered a fatal error.\n\n{ex?.Message}\n\nDetails have been logged to:\n{_logPath}",
             "Media Downloader - Fatal Error",
             MessageBoxButton.OK,
