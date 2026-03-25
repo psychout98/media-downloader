@@ -35,7 +35,7 @@ Name: "backend"; Description: "Backend Server + Web UI"; Types: full compact cus
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "startmenu"; Description: "Create Start Menu shortcut"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checked
+Name: "startmenu"; Description: "Create Start Menu shortcut"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "startup"; Description: "Start on Windows login"; GroupDescription: "Startup:"
 
 [Files]
