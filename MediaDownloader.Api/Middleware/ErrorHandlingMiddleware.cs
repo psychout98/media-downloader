@@ -28,13 +28,24 @@ public class ErrorHandlingMiddleware
 
     private async Task HandleExceptionAsync(HttpContext context, Exception ex)
     {
+        // Don't handle cancelled requests
+        if (ex is OperationCanceledException)
+        {
+            context.Response.StatusCode = 499; // Client closed request
+            return;
+        }
+
         var (statusCode, errorKey) = ex switch
         {
             RealDebridException => (502, "rd_api_error"),
             FileNotFoundException => (404, "not_found"),
+            DirectoryNotFoundException => (404, "not_found"),
             ArgumentException => (422, "validation_error"),
             KeyNotFoundException => (404, "not_found"),
             InvalidOperationException => (400, "bad_request"),
+            UnauthorizedAccessException => (500, "permission_error"),
+            IOException => (500, "io_error"),
+            HttpRequestException => (502, "external_api_error"),
             _ => (500, "server_error")
         };
 
