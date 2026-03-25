@@ -42,6 +42,12 @@ builder.Services.AddScoped<IProgressRepository, ProgressRepository>();
 // HTTP clients
 builder.Services.AddApiHttpClients();
 
+// API clients
+builder.Services.AddScoped<TmdbClient>();
+builder.Services.AddScoped<TorrentioClient>();
+builder.Services.AddScoped<RealDebridClient>();
+builder.Services.AddScoped<MpcClient>();
+
 // Services
 builder.Services.AddSingleton<UpdateService>();
 
