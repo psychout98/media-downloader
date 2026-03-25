@@ -14,8 +14,9 @@ public class ProgressRepository : IProgressRepository
 
     public async Task SaveAsync(string mediaItemId, long positionMs, long durationMs)
     {
-        var watched = durationMs > 0 && (double)positionMs / durationMs >= 0.85;
         var existing = await _db.WatchProgress.FindAsync(mediaItemId);
+        // Once watched, never reset back to false
+        var watched = (existing?.Watched ?? false) || (durationMs > 0 && (double)positionMs / durationMs >= 0.85);
 
         if (existing != null)
         {

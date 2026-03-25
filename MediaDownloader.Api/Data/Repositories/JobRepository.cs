@@ -35,7 +35,15 @@ public class JobRepository : IJobRepository
     public async Task UpdateAsync(Job job)
     {
         job.UpdatedAt = DateTimeOffset.UtcNow.ToString("o");
-        _db.Jobs.Update(job);
+
+        var entry = _db.Entry(job);
+        if (entry.State == EntityState.Detached)
+            _db.Jobs.Attach(job);
+
+        // Mark all properties as modified EXCEPT Log, which is managed via AppendLogAsync raw SQL
+        entry.State = EntityState.Modified;
+        entry.Property(j => j.Log).IsModified = false;
+
         await _db.SaveChangesAsync();
     }
 

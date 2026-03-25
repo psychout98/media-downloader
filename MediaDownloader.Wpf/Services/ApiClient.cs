@@ -6,17 +6,26 @@ namespace MediaDownloader.Wpf.Services;
 
 public class ApiClient : IDisposable
 {
-    private readonly HttpClient _client;
+    private HttpClient _client;
+    private int _port;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public ApiClient(int port = 8000)
     {
-        _client = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}"), Timeout = TimeSpan.FromSeconds(10) };
+        _port = port;
+        _client = CreateClient(port);
     }
+
+    private static HttpClient CreateClient(int port) =>
+        new() { BaseAddress = new Uri($"http://localhost:{port}"), Timeout = TimeSpan.FromSeconds(10) };
 
     public void UpdatePort(int port)
     {
-        _client.BaseAddress = new Uri($"http://localhost:{port}");
+        if (port == _port) return;
+        _port = port;
+        var old = _client;
+        _client = CreateClient(port);
+        old.Dispose();
     }
 
     public async Task<T?> GetAsync<T>(string path)

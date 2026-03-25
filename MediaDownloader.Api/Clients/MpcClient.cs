@@ -47,19 +47,14 @@ public class MpcClient
 
     private string BaseUrl => _settings.CurrentValue.Mpc.Url.TrimEnd('/');
 
-    private HttpClient CreateClient()
-    {
-        var client = _httpClientFactory.CreateClient("mpc");
-        client.BaseAddress = new Uri(BaseUrl);
-        return client;
-    }
+    private HttpClient CreateClient() => _httpClientFactory.CreateClient("mpc");
 
     public async Task<MpcStatus> GetStatusAsync()
     {
         try
         {
             var client = CreateClient();
-            var response = await client.GetAsync("/variables.html");
+            var response = await client.GetAsync($"{BaseUrl}/variables.html");
             response.EnsureSuccessStatusCode();
 
             var body = await response.Content.ReadAsStringAsync();
@@ -102,9 +97,9 @@ public class MpcClient
         try
         {
             var client = CreateClient();
-            var url = $"/command.html?wm_command={commandId}";
+            var url = $"{BaseUrl}/command.html?wm_command={commandId}";
             if (positionMs.HasValue && commandId == MpcCommands.Seek)
-                url += $"&position={positionMs.Value}";
+                url += $"&position={MsToString(positionMs.Value)}";
 
             var response = await client.GetAsync(url);
             return response.IsSuccessStatusCode;
@@ -121,7 +116,7 @@ public class MpcClient
         try
         {
             var client = CreateClient();
-            var url = $"/command.html?wm_command={MpcCommands.OpenFile}&path={HttpUtility.UrlEncode(path)}";
+            var url = $"{BaseUrl}/command.html?wm_command={MpcCommands.OpenFile}&path={HttpUtility.UrlEncode(path)}";
             var response = await client.GetAsync(url);
             return response.IsSuccessStatusCode;
         }
@@ -137,7 +132,7 @@ public class MpcClient
         try
         {
             var client = CreateClient();
-            var response = await client.GetAsync("/variables.html");
+            var response = await client.GetAsync($"{BaseUrl}/variables.html");
             return response.IsSuccessStatusCode;
         }
         catch

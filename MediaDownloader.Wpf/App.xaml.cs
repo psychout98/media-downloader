@@ -10,7 +10,7 @@ public partial class App : System.Windows.Application
 {
     private const string MutexName = "MediaDownloader_SingleInstance_Mutex";
     private Mutex? _mutex;
-    private static string _logPath = null!;
+    private static string _logPath = Path.Combine(Path.GetTempPath(), "mediadownloader-startup.log");
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -23,14 +23,41 @@ public partial class App : System.Windows.Application
 
     private const int SW_RESTORE = 9;
 
+    // Static constructor runs BEFORE App.xaml resources are loaded.
+    // This ensures we can capture exceptions that occur during XAML initialization.
+    static App()
+    {
+        try
+        {
+            var logDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MediaDownloader", "logs");
+            Directory.CreateDirectory(logDir);
+            _logPath = Path.Combine(logDir, "wpf-startup.log");
+            Log("Static constructor — logging initialized before XAML");
+
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                Log($"FATAL (early handler): {ex}");
+                System.Windows.MessageBox.Show(
+                    $"Media Downloader crashed during startup.\n\n{ex?.GetType().Name}: {ex?.Message}\n\nInner: {ex?.InnerException?.Message}\n\nFull details logged to:\n{_logPath}",
+                    "Media Downloader — Startup Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            };
+        }
+        catch (Exception ex)
+        {
+            _logPath = Path.Combine(Path.GetTempPath(), "mediadownloader-crash.log");
+            try { File.WriteAllText(_logPath, $"Static init failed: {ex}"); } catch { }
+        }
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
-        // Set up crash log path early, before anything can fail
-        var logDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MediaDownloader", "logs");
-        Directory.CreateDirectory(logDir);
-        _logPath = Path.Combine(logDir, "wpf-startup.log");
+        // Log directory already created in static constructor
+        Log("OnStartup starting");
 
         // Wire up global exception handlers
         DispatcherUnhandledException += OnDispatcherUnhandledException;

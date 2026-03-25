@@ -140,7 +140,7 @@ public class TmdbClient
         var results = json.GetProperty("results");
 
         if (results.GetArrayLength() == 0)
-            throw new InvalidOperationException($"No results found for query: {rawQuery}");
+            throw new KeyNotFoundException($"No results found for query: {rawQuery}");
 
         foreach (var result in results.EnumerateArray())
         {
@@ -150,7 +150,7 @@ public class TmdbClient
             return await BuildMediaInfoAsync(result, mediaType, season, episode);
         }
 
-        throw new InvalidOperationException($"No movie or TV results found for query: {rawQuery}");
+        throw new KeyNotFoundException($"No movie or TV results found for query: {rawQuery}");
     }
 
     private async Task<MediaInfo?> ResolveImdbIdAsync(string imdbId)
@@ -309,7 +309,7 @@ public class TmdbClient
         return string.Empty;
     }
 
-    public async Task<(string title, int? year, string? posterPath)> FuzzyResolveAsync(string title, string type)
+    public async Task<(string title, int? year, string? posterPath, int? tmdbId)> FuzzyResolveAsync(string title, string type)
     {
         // Try typed search first
         var result = await TypedSearchAsync(title, type);
@@ -331,7 +331,7 @@ public class TmdbClient
         throw new InvalidOperationException($"Could not resolve title: {title}");
     }
 
-    private async Task<(string title, int? year, string? posterPath)?> TypedSearchAsync(string query, string type)
+    private async Task<(string title, int? year, string? posterPath, int? tmdbId)?> TypedSearchAsync(string query, string type)
     {
         try
         {
@@ -348,7 +348,8 @@ public class TmdbClient
                 var first = results[0];
                 var t = type == "movie" ? first.GetPropertyOrDefault("title") : first.GetPropertyOrDefault("name");
                 var dateStr = type == "movie" ? first.GetPropertyOrDefault("release_date") : first.GetPropertyOrDefault("first_air_date");
-                return (t ?? query, ParseYear(dateStr), first.GetPropertyOrDefault("poster_path"));
+                var id = first.TryGetProperty("id", out var idProp) ? idProp.GetInt32() : (int?)null;
+                return (t ?? query, ParseYear(dateStr), first.GetPropertyOrDefault("poster_path"), id);
             }
         }
         catch { /* non-critical */ }
@@ -356,7 +357,7 @@ public class TmdbClient
         return null;
     }
 
-    private async Task<(string title, int? year, string? posterPath)?> MultiSearchFallbackAsync(string query, string type)
+    private async Task<(string title, int? year, string? posterPath, int? tmdbId)?> MultiSearchFallbackAsync(string query, string type)
     {
         try
         {
@@ -374,7 +375,8 @@ public class TmdbClient
 
                 var t = type == "movie" ? result.GetPropertyOrDefault("title") : result.GetPropertyOrDefault("name");
                 var dateStr = type == "movie" ? result.GetPropertyOrDefault("release_date") : result.GetPropertyOrDefault("first_air_date");
-                return (t ?? query, ParseYear(dateStr), result.GetPropertyOrDefault("poster_path"));
+                var id = result.TryGetProperty("id", out var idProp) ? idProp.GetInt32() : (int?)null;
+                return (t ?? query, ParseYear(dateStr), result.GetPropertyOrDefault("poster_path"), id);
             }
         }
         catch { /* non-critical */ }

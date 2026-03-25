@@ -6,6 +6,7 @@ using MediaDownloader.Api.Data;
 using MediaDownloader.Api.Data.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace MediaDownloader.Api.Controllers;
 
@@ -16,18 +17,22 @@ public class MpcController : ControllerBase
     private readonly TmdbClient _tmdbClient;
     private readonly IMediaItemRepository _mediaItemRepo;
     private readonly AppDbContext _db;
+    private readonly IMemoryCache _cache;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public MpcController(MpcClient mpcClient, TmdbClient tmdbClient, IMediaItemRepository mediaItemRepo, AppDbContext db)
+    public MpcController(MpcClient mpcClient, TmdbClient tmdbClient, IMediaItemRepository mediaItemRepo, AppDbContext db, IMemoryCache cache, IServiceScopeFactory scopeFactory)
     {
         _mpcClient = mpcClient;
         _tmdbClient = tmdbClient;
         _mediaItemRepo = mediaItemRepo;
         _db = db;
+        _cache = cache;
+        _scopeFactory = scopeFactory;
     }
 
     [HttpGet("/api/mpc/status")]
@@ -54,8 +59,15 @@ public class MpcController : ControllerBase
         {
             while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
             {
-                var status = await _mpcClient.GetStatusAsync();
-                var enriched = await EnrichStatusAsync(status);
+                // Create a new scope per iteration to avoid stale DbContext
+                using var scope = _scopeFactory.CreateScope();
+                var mpcClient = scope.ServiceProvider.GetRequiredService<MpcClient>();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var mediaItemRepo = scope.ServiceProvider.GetRequiredService<IMediaItemRepository>();
+                var tmdbClient = scope.ServiceProvider.GetRequiredService<TmdbClient>();
+
+                var status = await mpcClient.GetStatusAsync();
+                var enriched = await EnrichStatusWithScopeAsync(status, db, mediaItemRepo, tmdbClient);
 
                 var json = JsonSerializer.Serialize(enriched, JsonOptions);
                 var bytes = Encoding.UTF8.GetBytes(json);
@@ -94,13 +106,26 @@ public class MpcController : ControllerBase
         if (mediaItem?.FilePath == null || !System.IO.File.Exists(mediaItem.FilePath))
             return NotFound(new { error = "not_found", detail = "Media file not found" });
 
-        // If playlist provided, open first file then queue rest
+        // If playlist provided, create .m3u and open that
         if (request.Playlist is { Count: > 0 })
         {
-            // Open the primary file
-            var success = await _mpcClient.OpenFileAsync(mediaItem.FilePath);
+            var paths = new List<string> { mediaItem.FilePath };
+            foreach (var pid in request.Playlist.Where(id => id != request.MediaItemId))
+            {
+                var pItem = await _mediaItemRepo.GetByIdAsync(pid);
+                if (pItem?.FilePath != null && System.IO.File.Exists(pItem.FilePath))
+                    paths.Add(pItem.FilePath);
+            }
+
+            // Write temporary .m3u playlist
+            var tempDir = Path.Combine(Path.GetTempPath(), "MediaDownloader");
+            Directory.CreateDirectory(tempDir);
+            var m3uPath = Path.Combine(tempDir, $"playlist_{Guid.NewGuid():N}.m3u");
+            await System.IO.File.WriteAllLinesAsync(m3uPath, paths);
+
+            var success = await _mpcClient.OpenFileAsync(m3uPath);
             if (!success)
-                return StatusCode(502, new { error = "mpc_unreachable", detail = "Failed to open file in MPC-BE" });
+                return StatusCode(502, new { error = "mpc_unreachable", detail = "Failed to open playlist in MPC-BE" });
 
             return Ok(new { ok = true });
         }
@@ -218,10 +243,16 @@ public class MpcController : ControllerBase
             episode = currentItem.Episode;
             episodeTitle = currentItem.EpisodeTitle;
 
-            // Get episode count
+            // Get episode count (cached to avoid TMDB rate limits)
             if (season.HasValue && currentItem.Title.TmdbId.HasValue)
             {
-                episodeCount = await _tmdbClient.GetEpisodeCountAsync(currentItem.Title.TmdbId.Value, season.Value);
+                var cacheKey = $"epcount:{currentItem.Title.TmdbId}:{season}";
+                if (!_cache.TryGetValue(cacheKey, out int cachedCount))
+                {
+                    cachedCount = await _tmdbClient.GetEpisodeCountAsync(currentItem.Title.TmdbId.Value, season.Value);
+                    _cache.Set(cacheKey, cachedCount, TimeSpan.FromHours(1));
+                }
+                episodeCount = cachedCount;
             }
 
             // Get prev/next episodes
@@ -264,6 +295,77 @@ public class MpcController : ControllerBase
         };
     }
 
+    /// <summary>
+    /// EnrichStatus variant that uses explicitly-provided scoped services (for WebSocket loop).
+    /// </summary>
+    private async Task<object> EnrichStatusWithScopeAsync(MpcStatus status, AppDbContext db, IMediaItemRepository mediaItemRepo, TmdbClient tmdbClient)
+    {
+        if (!status.Reachable)
+        {
+            return new
+            {
+                reachable = false, fileName = (string?)null, state = 0, isPlaying = false, isPaused = false,
+                positionMs = 0L, durationMs = 0L, volume = 0, muted = false, titleId = (string?)null,
+                title = (string?)null, isAnime = false, season = (int?)null, episode = (int?)null,
+                episodeTitle = (string?)null, episodeCount = (int?)null, year = (int?)null,
+                type = (string?)null, prevEpisode = (object?)null, nextEpisode = (object?)null
+            };
+        }
+
+        Data.Entities.MediaItem? currentItem = null;
+        if (!string.IsNullOrEmpty(status.FilePath))
+        {
+            currentItem = await db.MediaItems.Include(m => m.Title)
+                .FirstOrDefaultAsync(m => m.FilePath == status.FilePath);
+        }
+
+        string? titleId = null, titleName = null, episodeTitleStr = null, type = null;
+        int? season = null, ep = null, episodeCount = null, year = null;
+        bool isAnime = false;
+        object? prevEpisode = null, nextEpisode = null;
+
+        if (currentItem?.Title != null)
+        {
+            titleId = currentItem.Title.Id;
+            titleName = currentItem.Title.Name;
+            type = currentItem.Title.Type;
+            year = currentItem.Title.Year;
+            isAnime = currentItem.Title.IsAnime;
+            season = currentItem.Season;
+            ep = currentItem.Episode;
+            episodeTitleStr = currentItem.EpisodeTitle;
+
+            if (season.HasValue && currentItem.Title.TmdbId.HasValue)
+            {
+                var cacheKey = $"epcount:{currentItem.Title.TmdbId}:{season}";
+                if (!_cache.TryGetValue(cacheKey, out int cachedCount))
+                {
+                    cachedCount = await tmdbClient.GetEpisodeCountAsync(currentItem.Title.TmdbId.Value, season.Value);
+                    _cache.Set(cacheKey, cachedCount, TimeSpan.FromHours(1));
+                }
+                episodeCount = cachedCount;
+            }
+
+            if (season.HasValue && ep.HasValue)
+            {
+                var prev = await mediaItemRepo.FindAdjacentEpisodeAsync(currentItem.TitleId, season.Value, ep.Value, next: false);
+                var next = await mediaItemRepo.FindAdjacentEpisodeAsync(currentItem.TitleId, season.Value, ep.Value, next: true);
+                if (prev != null) prevEpisode = new { mediaItemId = prev.Id, episode = prev.Episode, title = prev.EpisodeTitle };
+                if (next != null) nextEpisode = new { mediaItemId = next.Id, episode = next.Episode, title = next.EpisodeTitle };
+            }
+        }
+
+        return new
+        {
+            reachable = true, fileName = status.FileName, state = status.State,
+            isPlaying = status.IsPlaying, isPaused = status.IsPaused,
+            positionMs = status.Position, durationMs = status.Duration,
+            volume = status.Volume, muted = status.Muted,
+            titleId, title = titleName, isAnime, season, episode = ep,
+            episodeTitle = episodeTitleStr, episodeCount, year, type, prevEpisode, nextEpisode
+        };
+    }
+
     private static int? ResolveCommand(string command)
     {
         return command.ToUpperInvariant() switch
@@ -276,6 +378,7 @@ public class MpcController : ControllerBase
             "MUTE" => MpcCommands.Mute,
             "VOLUME_UP" or "VOLUMEUP" => MpcCommands.VolumeUp,
             "VOLUME_DOWN" or "VOLUMEDOWN" => MpcCommands.VolumeDown,
+            "VOLUME" => MpcCommands.VolumeUp, // Absolute volume not supported by MPC-BE; use volume up/down or mute
             _ => null
         };
     }

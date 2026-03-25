@@ -10,11 +10,14 @@ public class SettingsController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly RealDebridClient _rdClient;
 
-    public SettingsController(IConfiguration configuration, RealDebridClient rdClient)
+    public SettingsController(IConfiguration configuration, RealDebridClient rdClient, IServiceProvider serviceProvider)
     {
         _configuration = configuration;
         _rdClient = rdClient;
+        _serviceProvider = serviceProvider;
     }
+
+    private readonly IServiceProvider _serviceProvider;
 
     [HttpGet("/api/settings")]
     public IActionResult GetSettings()
@@ -38,34 +41,55 @@ public class SettingsController : ControllerBase
                 return BadRequest(new { error = "validation_error", detail = $"Unknown setting key: {key}" });
         }
 
-        // Read existing .env
+        // Read existing .env preserving original structure
         var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
-        var lines = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var originalLines = System.IO.File.Exists(envPath)
+            ? System.IO.File.ReadAllLines(envPath).ToList()
+            : new List<string>();
 
-        if (System.IO.File.Exists(envPath))
-        {
-            foreach (var line in System.IO.File.ReadAllLines(envPath))
-            {
-                var trimmed = line.Trim();
-                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
-
-                var eqIdx = trimmed.IndexOf('=');
-                if (eqIdx > 0)
-                    lines[trimmed[..eqIdx]] = trimmed[(eqIdx + 1)..];
-            }
-        }
+        var updatedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Update values
         foreach (var (key, rawValue) in settings)
         {
             var value = Configuration.ConfigurationExtensions.StripQuotes(rawValue);
-            lines[key] = value;
             written.Add(key);
+            updatedKeys.Add(key);
+
+            // Find and update existing line in-place
+            var found = false;
+            for (var i = 0; i < originalLines.Count; i++)
+            {
+                var trimmed = originalLines[i].Trim();
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
+
+                var eqIdx = trimmed.IndexOf('=');
+                if (eqIdx > 0 && trimmed[..eqIdx].Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    originalLines[i] = $"{key}={value}";
+                    found = true;
+                    break;
+                }
+            }
+
+            // Append new keys at the end
+            if (!found)
+                originalLines.Add($"{key}={value}");
         }
 
-        // Write back
-        var output = lines.Select(kvp => $"{kvp.Key}={kvp.Value}");
-        System.IO.File.WriteAllLines(envPath, output);
+        // Write back preserving comments and structure
+        System.IO.File.WriteAllLines(envPath, originalLines);
+
+        // Update in-process environment variables and reload configuration
+        foreach (var (key, rawValue) in settings)
+        {
+            var value = Configuration.ConfigurationExtensions.StripQuotes(rawValue);
+            Environment.SetEnvironmentVariable(key, value);
+        }
+        if (_configuration is IConfigurationRoot configRoot)
+        {
+            configRoot.Reload();
+        }
 
         return Ok(new { ok = true, written });
     }

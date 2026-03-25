@@ -55,25 +55,33 @@ public partial class MainWindow : WpfWindow
 
     private void SetupTrayIcon()
     {
-        _trayIcon = new NotifyIcon
+        try
         {
-            Text = "Media Downloader",
-            Icon = System.Drawing.SystemIcons.Application,
-            Visible = true
-        };
+            _trayIcon = new NotifyIcon
+            {
+                Text = "Media Downloader",
+                Icon = System.Drawing.SystemIcons.Application,
+                Visible = true
+            };
 
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("Open", null, (_, _) => ShowFromTray());
-        menu.Items.Add("Open Web UI", null, (_, _) => _viewModel.OpenWebUiCommand.Execute(null));
-        menu.Items.Add("Launch MPC-BE", null, (_, _) => _viewModel.LaunchMpcCommand.Execute(null));
-        menu.Items.Add("Refresh Library", null, (_, _) => _viewModel.RefreshLibraryCommand.Execute(null));
-        menu.Items.Add("-");
-        menu.Items.Add("Settings", null, (_, _) => { ShowFromTray(); _viewModel.SelectedTab = 1; });
-        menu.Items.Add("-");
-        menu.Items.Add("Exit", null, (_, _) => { _forceClose = true; Close(); });
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("Open", null, (_, _) => ShowFromTray());
+            menu.Items.Add("Open Web UI", null, (_, _) => _viewModel.OpenWebUiCommand.Execute(null));
+            menu.Items.Add("Launch MPC-BE", null, (_, _) => _viewModel.LaunchMpcCommand.Execute(null));
+            menu.Items.Add("Refresh Library", null, (_, _) => _viewModel.RefreshLibraryCommand.Execute(null));
+            menu.Items.Add("-");
+            menu.Items.Add("Settings", null, (_, _) => { ShowFromTray(); _viewModel.SelectedTab = 1; });
+            menu.Items.Add("-");
+            menu.Items.Add("Exit", null, (_, _) => { _forceClose = true; Close(); });
 
-        _trayIcon.ContextMenuStrip = menu;
-        _trayIcon.DoubleClick += (_, _) => ShowFromTray();
+            _trayIcon.ContextMenuStrip = menu;
+            _trayIcon.DoubleClick += (_, _) => ShowFromTray();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"Failed to set up tray icon (non-fatal): {ex.Message}");
+            // App works fine without a tray icon
+        }
     }
 
     private void ShowFromTray()
@@ -89,13 +97,13 @@ public partial class MainWindow : WpfWindow
         {
             e.Cancel = true;
             Hide();
-            _trayIcon?.ShowBalloonTip(2000, "Media Downloader",
-                "Minimized to system tray. Right-click for quick menu.", ToolTipIcon.Info);
+            try { _trayIcon?.ShowBalloonTip(2000, "Media Downloader",
+                "Minimized to system tray. Right-click for quick menu.", ToolTipIcon.Info); } catch { }
             return;
         }
 
-        _viewModel.Dispose();
-        _trayIcon?.Dispose();
+        try { _viewModel.Dispose(); } catch (Exception ex) { App.Log($"ViewModel dispose error: {ex.Message}"); }
+        try { _trayIcon?.Dispose(); } catch { }
         base.OnClosing(e);
     }
 }

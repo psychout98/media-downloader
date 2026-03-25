@@ -28,6 +28,9 @@ public class MediaItem
     [Column("file_path")]
     public string? FilePath { get; set; }
 
+    [Column("size_bytes")]
+    public long? SizeBytes { get; set; }
+
     [Column("is_archived")]
     public bool IsArchived { get; set; }
 

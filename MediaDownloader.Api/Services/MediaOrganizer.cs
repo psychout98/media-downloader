@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using MediaDownloader.Api.Clients;
 using MediaDownloader.Api.Configuration;
+using MediaDownloader.Shared.Constants;
 using Microsoft.Extensions.Options;
 
 namespace MediaDownloader.Api.Services;
@@ -10,8 +11,7 @@ public class MediaOrganizer
     private readonly IOptionsMonitor<AppSettings> _settings;
     private readonly ILogger<MediaOrganizer> _logger;
 
-    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
-        { ".mkv", ".mp4", ".avi" };
+    private static HashSet<string> VideoExts => VideoExtensions.All;
 
     public MediaOrganizer(IOptionsMonitor<AppSettings> settings, ILogger<MediaOrganizer> logger)
     {
@@ -51,7 +51,7 @@ public class MediaOrganizer
         foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
         {
             var ext = Path.GetExtension(file);
-            if (!VideoExtensions.Contains(ext)) continue;
+            if (!VideoExts.Contains(ext)) continue;
 
             var info = new FileInfo(file);
             if (info.Length > maxSize)

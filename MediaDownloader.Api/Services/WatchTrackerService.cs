@@ -21,8 +21,7 @@ public class WatchTrackerService : BackgroundService
     private static readonly HashSet<string> SubtitleExtensions = new(StringComparer.OrdinalIgnoreCase)
         { ".srt", ".ass", ".ssa", ".sub", ".idx", ".vtt" };
 
-    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
-        { ".mkv", ".mp4", ".avi", ".m4v", ".wmv", ".flv", ".mov" };
+    private static HashSet<string> VideoExtensions => Shared.Constants.VideoExtensions.All;
 
     public WatchTrackerService(IServiceScopeFactory scopeFactory, IOptionsMonitor<AppSettings> settings, ILogger<WatchTrackerService> logger)
     {
@@ -90,9 +89,8 @@ public class WatchTrackerService : BackgroundService
 
             _prevFile = currentFile;
         }
-        else
+        else if (status.State == 0) // Stopped (not paused)
         {
-            // Stopped or paused
             _stoppedCount++;
             if (_stoppedCount >= 2 && _prevFile != null)
             {
@@ -100,6 +98,11 @@ public class WatchTrackerService : BackgroundService
                 _prevFile = null;
                 _stoppedCount = 0;
             }
+        }
+        else
+        {
+            // Paused — reset stopped counter
+            _stoppedCount = 0;
         }
     }
 

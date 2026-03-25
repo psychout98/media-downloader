@@ -177,15 +177,14 @@ export default function NowPlayingTab({ addToast }: NowPlayingTabProps) {
     [exec, status],
   );
 
-  const handleVolumeClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!status) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      const vol = Math.round(ratio * 100);
-      exec(() => sendMpcCommand('VOLUME', vol), 'Volume');
-    },
-    [exec, status],
+  const handleVolumeUp = useCallback(
+    () => exec(() => sendMpcCommand('VOLUME_UP'), 'Volume up'),
+    [exec],
+  );
+
+  const handleVolumeDown = useCallback(
+    () => exec(() => sendMpcCommand('VOLUME_DOWN'), 'Volume down'),
+    [exec],
   );
 
   const handlePrevEpisode = useCallback(() => {
@@ -321,15 +320,24 @@ export default function NowPlayingTab({ addToast }: NowPlayingTabProps) {
             >
               {status.muted ? '🔇' : '🔊'}
             </button>
-            <div
-              className="h-2 flex-1 bg-surface-3 rounded cursor-pointer"
-              onClick={handleVolumeClick}
+            <button
+              onClick={handleVolumeDown}
+              className="bg-surface-2 rounded-lg px-2 py-1 text-xs text-text hover:bg-surface-3 transition-colors shrink-0"
             >
+              −
+            </button>
+            <div className="h-2 flex-1 bg-surface-3 rounded">
               <div
                 className="h-full bg-accent rounded"
                 style={{ width: `${status.muted ? 0 : volumePercent}%` }}
               />
             </div>
+            <button
+              onClick={handleVolumeUp}
+              className="bg-surface-2 rounded-lg px-2 py-1 text-xs text-text hover:bg-surface-3 transition-colors shrink-0"
+            >
+              +
+            </button>
             <span className="font-mono text-sm text-text-dim w-10 text-right shrink-0">
               {status.muted ? 0 : volumePercent}%
             </span>

@@ -151,11 +151,11 @@ public class MainViewModel : ViewModelBase, IDisposable
         OpenWebUiCommand = new RelayCommand(() => OpenUrl($"http://localhost:{Port}"));
         OpenMediaLibraryCommand = new RelayCommand(() => OpenFolder(MoviesDir));
         LaunchMpcCommand = new RelayCommand(LaunchMpc);
-        RefreshLibraryCommand = new RelayCommand(async () => await RefreshLibraryAsync());
-        SaveSettingsCommand = new RelayCommand(async () => await SaveSettingsAsync());
-        CancelSettingsCommand = new RelayCommand(async () => await LoadSettingsAsync());
-        UpdateNowCommand = new RelayCommand(async () => await UpdateNowAsync());
-        TestRdKeyCommand = new RelayCommand(async () => await TestRdKeyAsync());
+        RefreshLibraryCommand = new RelayCommand(() => RunAsync(RefreshLibraryAsync));
+        SaveSettingsCommand = new RelayCommand(() => RunAsync(SaveSettingsAsync));
+        CancelSettingsCommand = new RelayCommand(() => RunAsync(LoadSettingsAsync));
+        UpdateNowCommand = new RelayCommand(() => RunAsync(UpdateNowAsync));
+        TestRdKeyCommand = new RelayCommand(() => RunAsync(TestRdKeyAsync));
 
         // Poll timer
         _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
@@ -163,6 +163,16 @@ public class MainViewModel : ViewModelBase, IDisposable
 
         UpdateServerStatus();
         App.Log("MainViewModel constructor completed");
+    }
+
+    /// <summary>
+    /// Fire-and-forget wrapper that catches exceptions from async commands
+    /// to prevent unhandled async void crashes.
+    /// </summary>
+    private static async void RunAsync(Func<Task> action)
+    {
+        try { await action(); }
+        catch (Exception ex) { App.Log($"Command failed: {ex.Message}"); }
     }
 
     public async Task InitializeAsync()

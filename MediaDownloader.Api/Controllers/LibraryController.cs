@@ -14,19 +14,22 @@ public class LibraryController : ControllerBase
     private readonly LibraryManager _libraryManager;
     private readonly ProgressService _progressService;
     private readonly IOptionsMonitor<AppSettings> _settings;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     public LibraryController(
         ITitleRepository titleRepo,
         IMediaItemRepository mediaItemRepo,
         LibraryManager libraryManager,
         ProgressService progressService,
-        IOptionsMonitor<AppSettings> settings)
+        IOptionsMonitor<AppSettings> settings,
+        IHttpClientFactory httpClientFactory)
     {
         _titleRepo = titleRepo;
         _mediaItemRepo = mediaItemRepo;
         _libraryManager = libraryManager;
         _progressService = progressService;
         _settings = settings;
+        _httpClientFactory = httpClientFactory;
     }
 
     [HttpGet("/api/library")]
@@ -46,11 +49,7 @@ public class LibraryController : ControllerBase
             var mediaItems = await _mediaItemRepo.GetByTitleIdAsync(title.Id, includeArchived: true);
             var totalSize = mediaItems
                 .Where(m => m.FilePath != null)
-                .Sum(m =>
-                {
-                    try { return new FileInfo(m.FilePath!).Length; }
-                    catch { return 0L; }
-                });
+                .Sum(m => m.SizeBytes ?? 0L);
 
             items.Add(new
             {
@@ -90,7 +89,7 @@ public class LibraryController : ControllerBase
     public async Task<IActionResult> GetPoster([FromQuery] string titleId)
     {
         var posterDir = Path.Combine(_settings.CurrentValue.Media.AppDataDir, "posters");
-        var posterFile = Path.Combine(posterDir, $"{titleId}.jpg");
+        var posterFile = Path.Combine(posterDir, $"{Services.JobProcessorService.SafePosterKey(titleId)}.jpg");
 
         if (!System.IO.File.Exists(posterFile))
         {
@@ -102,7 +101,7 @@ public class LibraryController : ControllerBase
             try
             {
                 Directory.CreateDirectory(posterDir);
-                using var httpClient = new HttpClient();
+                using var httpClient = _httpClientFactory.CreateClient("default");
                 var data = await httpClient.GetByteArrayAsync($"https://image.tmdb.org/t/p/w500{title.PosterPath}");
                 await System.IO.File.WriteAllBytesAsync(posterFile, data);
             }
@@ -112,8 +111,8 @@ public class LibraryController : ControllerBase
             }
         }
 
-        var bytes = await System.IO.File.ReadAllBytesAsync(posterFile);
-        return File(bytes, "image/jpeg");
+        var stream = new FileStream(posterFile, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return File(stream, "image/jpeg");
     }
 
     [HttpGet("/api/library/episodes")]
@@ -150,6 +149,30 @@ public class LibraryController : ControllerBase
                     } : null
                 }).ToList()
             }).ToList();
+
+        // Include standalone items (movies) without season info in a virtual "season 0"
+        var standalone = mediaItems
+            .Where(m => !m.Season.HasValue)
+            .Select(m => new
+            {
+                mediaItemId = m.Id,
+                episode = m.Episode,
+                episodeTitle = m.EpisodeTitle,
+                fileName = m.FilePath != null ? Path.GetFileName(m.FilePath) : null,
+                filePath = m.FilePath,
+                isArchived = m.IsArchived,
+                progress = m.WatchProgress != null ? new
+                {
+                    positionMs = m.WatchProgress.PositionMs,
+                    durationMs = m.WatchProgress.DurationMs,
+                    watched = m.WatchProgress.Watched
+                } : null
+            }).ToList();
+
+        if (standalone.Count > 0)
+        {
+            seasons.Insert(0, new { season = 0, episodes = standalone });
+        }
 
         return Ok(new { seasons });
     }

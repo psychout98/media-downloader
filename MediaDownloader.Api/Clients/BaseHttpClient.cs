@@ -25,6 +25,7 @@ public static class HttpClientRegistration
             .AddPolicyHandler(retryPolicy)
             .ConfigureHttpClient(client =>
             {
+                client.BaseAddress = new Uri("https://api.github.com/");
                 client.Timeout = TimeSpan.FromSeconds(10);
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("MediaDownloader/1.0");
                 client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github.v3+json");

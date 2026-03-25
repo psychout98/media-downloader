@@ -28,7 +28,7 @@ public class UpdateService
         {
             var client = _httpClientFactory.CreateClient("github");
             var response = await client.GetFromJsonAsync<GitHubRelease>(
-                $"https://api.github.com/repos/{_githubRepo}/releases/latest");
+                $"repos/{_githubRepo}/releases/latest");
 
             if (response?.TagName != null)
             {

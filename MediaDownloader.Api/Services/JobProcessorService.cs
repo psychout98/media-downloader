@@ -157,11 +157,18 @@ public class JobProcessorService : BackgroundService
 
                 await jobRepo.AppendLogAsync(jobId, $"Downloading: {fileName}");
 
-                var downloadProgress = new Progress<(long downloaded, long total)>(d =>
+                var lastProgressUpdate = DateTimeOffset.MinValue;
+                var downloadProgress = new Progress<(long downloaded, long total)>(async d =>
                 {
                     job.DownloadedBytes = totalDownloaded + d.downloaded;
                     job.Progress = totalSize > 0 ? (double)job.DownloadedBytes / totalSize : 0;
-                    try { jobRepo.UpdateAsync(job).GetAwaiter().GetResult(); } catch { /* best effort */ }
+                    // Throttle DB updates to once per second
+                    var now = DateTimeOffset.UtcNow;
+                    if ((now - lastProgressUpdate).TotalSeconds >= 1)
+                    {
+                        lastProgressUpdate = now;
+                        try { await jobRepo.UpdateAsync(job); } catch { /* best effort */ }
+                    }
                 });
 
                 await downloadService.DownloadFileAsync(url, destPath, downloadProgress, ct);
@@ -183,6 +190,7 @@ public class JobProcessorService : BackgroundService
                 if (mediaItem != null)
                 {
                     mediaItem.FilePath = dest;
+                    mediaItem.SizeBytes = File.Exists(dest) ? new FileInfo(dest).Length : null;
                     await mediaItemRepo.UpdateAsync(mediaItem);
                 }
             }
@@ -210,12 +218,29 @@ public class JobProcessorService : BackgroundService
                         ? mediaItems.FirstOrDefault(m => m.Episode == epNum)
                         : mediaItems.FirstOrDefault(m => m.FilePath == null);
 
+                    var fileSize = File.Exists(dest) ? new FileInfo(dest).Length : (long?)null;
                     if (item != null)
                     {
                         item.FilePath = dest;
                         item.Episode = epNum;
                         item.EpisodeTitle = epTitle;
+                        item.SizeBytes = fileSize;
                         await mediaItemRepo.UpdateAsync(item);
+                    }
+                    else
+                    {
+                        // Create new media item for episodes not pre-created
+                        var newItem = new MediaItem
+                        {
+                            TitleId = job.TitleId,
+                            JobId = job.Id,
+                            Season = streamData.Media.Season ?? 1,
+                            Episode = epNum,
+                            EpisodeTitle = epTitle,
+                            FilePath = dest,
+                            SizeBytes = fileSize
+                        };
+                        await mediaItemRepo.CreateAsync(newItem);
                     }
                 }
             }
@@ -293,7 +318,7 @@ public class JobProcessorService : BackgroundService
         try
         {
             Directory.CreateDirectory(posterDir);
-            using var httpClient = new HttpClient();
+            using var httpClient = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("default");
             var data = await httpClient.GetByteArrayAsync($"https://image.tmdb.org/t/p/w500{posterPath}");
             await File.WriteAllBytesAsync(posterFile, data);
         }
@@ -331,8 +356,7 @@ public class JobProcessorService : BackgroundService
         var filename = FilenameFromUrl(url);
         if (filename == null) return false;
 
-        var ext = Path.GetExtension(filename).ToLowerInvariant();
-        return ext is ".mkv" or ".mp4" or ".avi" or ".m4v" or ".wmv";
+        return Shared.Constants.VideoExtensions.IsVideoFile(filename);
     }
 
     public static int? EpisodeFromFilename(string filename)

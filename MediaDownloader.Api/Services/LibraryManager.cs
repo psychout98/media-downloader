@@ -15,8 +15,7 @@ public class LibraryManager
     private readonly IOptionsMonitor<AppSettings> _settings;
     private readonly ILogger<LibraryManager> _logger;
 
-    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
-        { ".mkv", ".mp4", ".avi", ".m4v", ".wmv", ".flv", ".mov" };
+    private static HashSet<string> VideoExtensions => Shared.Constants.VideoExtensions.All;
 
     private static readonly Regex QualityTagPattern = new(
         @"(720p|1080p|2160p|4K|BluRay|BRRip|WEBRip|WEB-DL|HDRip|DVDRip|x264|x265|HEVC|AAC|DTS|REMUX|PROPER|REPACK)",
@@ -113,7 +112,12 @@ public class LibraryManager
                 episodeTitle = afterEp;
         }
 
-        var isArchived = filePath.StartsWith(_settings.CurrentValue.Media.ArchiveDir, StringComparison.OrdinalIgnoreCase);
+        var normalizedArchiveDir = Path.GetFullPath(_settings.CurrentValue.Media.ArchiveDir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var normalizedFilePath = Path.GetFullPath(filePath);
+        var isArchived = normalizedFilePath.StartsWith(normalizedArchiveDir, StringComparison.OrdinalIgnoreCase);
+
+        long? sizeBytes = null;
+        try { sizeBytes = new FileInfo(filePath).Length; } catch { /* best effort */ }
 
         db.MediaItems.Add(new MediaItem
         {
@@ -122,6 +126,7 @@ public class LibraryManager
             Episode = episode,
             EpisodeTitle = episodeTitle,
             FilePath = filePath,
+            SizeBytes = sizeBytes,
             IsArchived = isArchived
         });
     }
@@ -203,10 +208,11 @@ public class LibraryManager
                 // Resolve via TMDB if missing tmdb_id
                 if (!title.TmdbId.HasValue && !string.IsNullOrEmpty(title.Name))
                 {
-                    var (resolvedTitle, year, posterPath) = await tmdbClient.FuzzyResolveAsync(title.Name, title.Type);
+                    var (resolvedTitle, year, posterPath, tmdbId) = await tmdbClient.FuzzyResolveAsync(title.Name, title.Type);
                     title.Name = resolvedTitle;
                     if (year.HasValue) title.Year = year;
                     if (posterPath != null) title.PosterPath = posterPath;
+                    if (tmdbId.HasValue) title.TmdbId = tmdbId;
                     await titleRepo.UpdateAsync(title);
                 }
 
@@ -239,7 +245,8 @@ public class LibraryManager
         try
         {
             var url = $"https://image.tmdb.org/t/p/w500{posterPath}";
-            using var httpClient = new HttpClient();
+            using var scope = _scopeFactory.CreateScope();
+            var httpClient = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("default");
             var data = await httpClient.GetByteArrayAsync(url);
             Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
             await File.WriteAllBytesAsync(destFile, data);
