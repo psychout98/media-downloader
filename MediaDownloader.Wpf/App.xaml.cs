@@ -10,7 +10,7 @@ public partial class App : System.Windows.Application
 {
     private const string MutexName = "MediaDownloader_SingleInstance_Mutex";
     private Mutex? _mutex;
-    private static string _logPath = Path.Combine(Path.GetTempPath(), "mediadownloader-startup.log");
+    private static string _logPath = "";
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -23,54 +23,61 @@ public partial class App : System.Windows.Application
 
     private const int SW_RESTORE = 9;
 
-    // Static constructor runs BEFORE App.xaml resources are loaded.
-    // This ensures we can capture exceptions that occur during XAML initialization.
     static App()
     {
+        // This runs FIRST, before any XAML loads.
+        // Write to a guaranteed-writable location.
         try
         {
-            var logDir = Path.Combine(
+            _logPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MediaDownloader", "logs");
-            Directory.CreateDirectory(logDir);
-            _logPath = Path.Combine(logDir, "wpf-startup.log");
-            Log("Static constructor — logging initialized before XAML");
+                "MediaDownloader", "logs", "wpf-startup.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(_logPath)!);
+        }
+        catch
+        {
+            _logPath = Path.Combine(Path.GetTempPath(), "mediadownloader-startup.log");
+        }
 
-            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        Log("=== App starting ===");
+        Log($"Log path: {_logPath}");
+        Log($"Base dir: {AppDomain.CurrentDomain.BaseDirectory}");
+        Log($"OS: {Environment.OSVersion}");
+        Log($"64-bit: {Environment.Is64BitProcess}");
+
+        // Install the earliest possible crash handler
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            var ex = e.ExceptionObject as Exception;
+            Log($"FATAL AppDomain: {ex}");
+            try
             {
-                var ex = e.ExceptionObject as Exception;
-                Log($"FATAL (early handler): {ex}");
                 System.Windows.MessageBox.Show(
-                    $"Media Downloader crashed during startup.\n\n{ex?.GetType().Name}: {ex?.Message}\n\nInner: {ex?.InnerException?.Message}\n\nFull details logged to:\n{_logPath}",
-                    "Media Downloader — Startup Error",
+                    $"Startup crash:\n\n{ex?.GetType().Name}: {ex?.Message}\n\nInner: {ex?.InnerException?.GetType().Name}: {ex?.InnerException?.Message}\n\nLog: {_logPath}",
+                    "Media Downloader",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
-            };
-        }
-        catch (Exception ex)
-        {
-            _logPath = Path.Combine(Path.GetTempPath(), "mediadownloader-crash.log");
-            try { File.WriteAllText(_logPath, $"Static init failed: {ex}"); } catch { }
-        }
+            }
+            catch { }
+        };
     }
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // Log directory already created in static constructor
-        Log("OnStartup starting");
+        Log("OnStartup");
 
-        // Wire up global exception handlers
         DispatcherUnhandledException += OnDispatcherUnhandledException;
-        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
-
-        Log("Application starting");
-
-        _mutex = new Mutex(true, MutexName, out var isNewInstance);
-
-        if (!isNewInstance)
+        TaskScheduler.UnobservedTaskException += (_, args) =>
         {
-            Log("Another instance already running, activating it");
+            Log($"Unobserved task: {args.Exception}");
+            args.SetObserved();
+        };
+
+        // Single instance
+        _mutex = new Mutex(true, MutexName, out var isNew);
+        if (!isNew)
+        {
+            Log("Another instance running, activating it");
             var hwnd = FindWindow(null, "Media Downloader");
             if (hwnd != IntPtr.Zero)
             {
@@ -81,43 +88,26 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        Log("Single instance check passed, proceeding with startup");
+        Log("Calling base.OnStartup (creates MainWindow)");
         base.OnStartup(e);
-        Log("OnStartup completed");
+        Log("OnStartup done");
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        Log($"FATAL dispatcher exception: {e.Exception}");
+        Log($"FATAL dispatcher: {e.Exception}");
         System.Windows.MessageBox.Show(
-            $"Media Downloader encountered an error and needs to close.\n\n{e.Exception.Message}\n\nDetails have been logged to:\n{_logPath}",
-            "Media Downloader - Error",
+            $"Error:\n\n{e.Exception.Message}\n\nInner: {e.Exception.InnerException?.Message}\n\nLog: {_logPath}",
+            "Media Downloader",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
         e.Handled = true;
         Shutdown(1);
     }
 
-    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
-    {
-        var ex = e.ExceptionObject as Exception;
-        Log($"FATAL unhandled exception: {ex}");
-        System.Windows.MessageBox.Show(
-            $"Media Downloader encountered a fatal error.\n\n{ex?.Message}\n\nDetails have been logged to:\n{_logPath}",
-            "Media Downloader - Fatal Error",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
-    }
-
-    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
-    {
-        Log($"Unobserved task exception: {e.Exception}");
-        e.SetObserved();
-    }
-
     protected override void OnExit(ExitEventArgs e)
     {
-        Log($"Application exiting with code {e.ApplicationExitCode}");
+        Log($"Exiting ({e.ApplicationExitCode})");
         _mutex?.ReleaseMutex();
         _mutex?.Dispose();
         base.OnExit(e);
@@ -127,9 +117,9 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}";
-            File.AppendAllText(_logPath, line);
+            File.AppendAllText(_logPath,
+                $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}");
         }
-        catch { /* logging must never throw */ }
+        catch { }
     }
 }
