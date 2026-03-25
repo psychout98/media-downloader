@@ -73,6 +73,9 @@ using (var scope = app.Services.CreateScope())
     await db.Database.EnsureCreatedAsync();
 }
 
+// Error handling middleware (before controllers)
+app.UseMiddleware<MediaDownloader.Api.Middleware.ErrorHandlingMiddleware>();
+
 // WebSocket support
 app.UseWebSockets();
 
