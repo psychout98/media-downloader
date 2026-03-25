@@ -1,0 +1,69 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Publish API (self-contained, win-x64)
+        run: dotnet publish MediaDownloader.Api -c Release --self-contained -r win-x64 -o publish/backend
+
+      - name: Publish WPF app (self-contained, win-x64)
+        run: dotnet publish MediaDownloader.Wpf -c Release --self-contained -r win-x64 -o publish/app
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy frontend to backend wwwroot
+        shell: bash
+        run: |
+          mkdir -p publish/backend/wwwroot
+          cp -r frontend/dist/* publish/backend/wwwroot/
+
+      - name: Build installer with Inno Setup
+        shell: cmd
+        run: |
+          set APP_VERSION=${{ steps.version.outputs.VERSION }}
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: installer/Output/MediaDownloader-Setup-*.exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Media Downloader v${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: installer/Output/MediaDownloader-Setup-*.exe
