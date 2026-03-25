@@ -50,6 +50,13 @@ builder.Services.AddScoped<MpcClient>();
 
 // Services
 builder.Services.AddSingleton<UpdateService>();
+builder.Services.AddScoped<MediaOrganizer>();
+builder.Services.AddScoped<FileDownloadService>();
+builder.Services.AddSingleton<LibraryManager>();
+builder.Services.AddSingleton<ProgressService>();
+builder.Services.AddSingleton<JobProcessorService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<JobProcessorService>());
+builder.Services.AddHostedService<WatchTrackerService>();
 
 // Controllers
 builder.Services.AddControllers();
