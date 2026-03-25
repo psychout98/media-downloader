@@ -1,11 +1,13 @@
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Forms;
 using MediaDownloader.Wpf.ViewModels;
+using WpfWindow = System.Windows.Window;
+using WpfWindowState = System.Windows.WindowState;
+using RoutedEventArgs = System.Windows.RoutedEventArgs;
 
 namespace MediaDownloader.Wpf;
 
-public partial class MainWindow : Window
+public partial class MainWindow : WpfWindow
 {
     private readonly MainViewModel _viewModel;
     private NotifyIcon? _trayIcon;
@@ -57,7 +59,7 @@ public partial class MainWindow : Window
     private void ShowFromTray()
     {
         Show();
-        WindowState = WindowState.Normal;
+        WindowState = WpfWindowState.Normal;
         Activate();
     }
 

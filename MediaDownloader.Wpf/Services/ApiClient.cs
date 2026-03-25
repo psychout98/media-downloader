@@ -48,7 +48,7 @@ public class ApiClient : IDisposable
     public record VersionResponse(string Version, bool UpdateAvailable, string? LatestVersion, string? ReleaseUrl);
     public record JobResponse(string Id, string TitleId, string? Query, string Status, double Progress, long SizeBytes, long DownloadedBytes, string? TorrentName, string? Error, string CreatedAt);
     public record JobsResponse(JobResponse[] Jobs);
-    public record SettingsResponse : Dictionary<string, string?> { }
+
     public record LibraryResponse(object[] Items, int Count);
 
     public async Task<StatusResponse?> GetStatusAsync() => await GetAsync<StatusResponse>("status");

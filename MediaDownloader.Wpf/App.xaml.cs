@@ -4,7 +4,7 @@ using System.Windows;
 
 namespace MediaDownloader.Wpf;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     private const string MutexName = "MediaDownloader_SingleInstance_Mutex";
     private Mutex? _mutex;
